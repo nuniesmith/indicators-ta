@@ -11,7 +11,7 @@ use crate::types::MacdResult;
 
 // ── Error ────────────────────────────────────────────────────────────────────
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IndicatorError {
     InsufficientData { required: usize, available: usize },
     InvalidParameter { name: String, value: f64 },
@@ -177,6 +177,12 @@ pub fn macd(
 // ── Incremental structs ───────────────────────────────────────────────────────
 
 /// Incremental EMA — O(1) update, SMA warm-up.
+///
+/// Unlike the batch [`ema`] function (which initialises from an SMA over the
+/// first `period` prices), this struct emits its first value *after* it has
+/// accumulated exactly `period` samples and seeds itself from their average.
+/// Both approaches are correct; this one is more natural for streaming use.
+#[derive(Debug, Clone)]
 pub struct EMA {
     period: usize,
     alpha: f64,
@@ -229,6 +235,7 @@ impl EMA {
 }
 
 /// Incremental Wilder ATR.
+#[derive(Debug, Clone)]
 pub struct ATR {
     #[allow(dead_code)]
     period: usize,
@@ -275,6 +282,7 @@ pub struct StrategyIndicators {
 }
 
 /// Multi-period indicator calculator (batch mode).
+#[derive(Debug, Clone)]
 pub struct IndicatorCalculator {
     pub fast_ema_period: usize,
     pub slow_ema_period: usize,

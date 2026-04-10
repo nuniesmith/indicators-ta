@@ -260,13 +260,15 @@ impl ADX {
             (atr, smoothed_plus_dm, smoothed_minus_dm)
             && atr_val > 0.0
         {
-            self.plus_di = Some((plus_dm_smooth / atr_val) * 100.0);
-            self.minus_di = Some((minus_dm_smooth / atr_val) * 100.0);
+            let plus_di = (plus_dm_smooth / atr_val) * 100.0;
+            let minus_di = (minus_dm_smooth / atr_val) * 100.0;
+            self.plus_di = Some(plus_di);
+            self.minus_di = Some(minus_di);
 
             // Calculate DX
-            let di_sum = self.plus_di.unwrap() + self.minus_di.unwrap();
+            let di_sum = plus_di + minus_di;
             if di_sum > 0.0 {
-                let di_diff = (self.plus_di.unwrap() - self.minus_di.unwrap()).abs();
+                let di_diff = (plus_di - minus_di).abs();
                 let dx = (di_diff / di_sum) * 100.0;
 
                 self.dx_values.push_back(dx);
@@ -528,6 +530,7 @@ pub struct RSI {
     gains: EMA,
     losses: EMA,
     prev_close: Option<f64>,
+    last_rsi: Option<f64>,
 }
 
 impl RSI {
@@ -538,6 +541,7 @@ impl RSI {
             gains: EMA::new(period),
             losses: EMA::new(period),
             prev_close: None,
+            last_rsi: None,
         }
     }
 
@@ -553,13 +557,14 @@ impl RSI {
             {
                 self.prev_close = Some(close);
 
-                if avg_loss == 0.0 {
-                    return Some(100.0);
-                }
-
-                let rs = avg_gain / avg_loss;
-                let rsi = 100.0 - (100.0 / (1.0 + rs));
-                return Some(rsi);
+                let rsi = if avg_loss == 0.0 {
+                    100.0
+                } else {
+                    let rs = avg_gain / avg_loss;
+                    100.0 - (100.0 / (1.0 + rs))
+                };
+                self.last_rsi = Some(rsi);
+                return self.last_rsi;
             }
         }
 
@@ -567,10 +572,11 @@ impl RSI {
         None
     }
 
-    /// Get the current RSI value
+    /// Get the most recent RSI value without consuming a new price tick.
+    ///
+    /// Returns `None` until the indicator has completed its warm-up period.
     pub fn value(&self) -> Option<f64> {
-        // RSI doesn't cache, caller should store the last update result
-        None
+        self.last_rsi
     }
 
     /// Check if RSI has enough data
@@ -588,6 +594,7 @@ impl RSI {
         self.gains.reset();
         self.losses.reset();
         self.prev_close = None;
+        self.last_rsi = None;
     }
 }
 
@@ -1022,16 +1029,38 @@ mod tests {
     }
 
     #[test]
-    fn test_rsi_reset() {
+    fn test_rsi_value_cached() {
+        let mut rsi = RSI::new(14);
+        assert!(rsi.value().is_none(), "value() should be None before warmup");
+
+        let mut last_from_update = None;
+        for i in 0..30 {
+            let price = 100.0 + i as f64;
+            if let Some(v) = rsi.update(price) {
+                last_from_update = Some(v);
+            }
+        }
+
+        // value() must equal the last result returned by update()
+        assert_eq!(
+            rsi.value(),
+            last_from_update,
+            "value() must equal the last update() result"
+        );
+    }
+
+    #[test]
+    fn test_rsi_reset_clears_value() {
         let mut rsi = RSI::new(14);
         for i in 0..30 {
             rsi.update(100.0 + i as f64);
         }
-        assert!(rsi.is_ready());
-
+        assert!(rsi.value().is_some());
         rsi.reset();
-        assert!(!rsi.is_ready());
+        assert!(rsi.value().is_none(), "value() should be None after reset");
     }
+
+
 
     // --- SMA Helper Test ---
 
