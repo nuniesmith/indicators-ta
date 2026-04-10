@@ -1,0 +1,230 @@
+//! Layer 7 — Market Structure + Fibonacci Engine.
+//!
+//! Detects swing highs/lows, identifies Break of Structure (BOS) and
+//! Change of Character (CHoCH), and computes Fibonacci retracement levels.
+
+use crate::types::Candle;
+use std::collections::VecDeque;
+
+pub struct MarketStructure {
+    swing_len: usize,
+    atr_mult: f64,
+    maxlen: usize,
+
+    highs:  VecDeque<f64>,
+    lows:   VecDeque<f64>,
+    closes: VecDeque<f64>,
+
+    swing_hi:      Option<f64>,
+    swing_lo:      Option<f64>,
+    prev_swing_hi: Option<f64>,
+    prev_swing_lo: Option<f64>,
+    atr:           Option<f64>,
+    bias_internal: i8,
+    fib_hi:  Option<f64>,
+    fib_lo:  Option<f64>,
+    fib_dir: i8,
+    last_broken_hi: Option<f64>,
+    last_broken_lo: Option<f64>,
+
+    // Published state
+    pub bias: i8,
+    pub fib618: Option<f64>,
+    pub fib500: Option<f64>,
+    pub fib382: Option<f64>,
+    pub fib786: Option<f64>,
+    pub in_discount: bool,
+    pub in_premium: bool,
+    pub bos: bool,
+    pub choch: bool,
+    pub choch_dir: i8,
+    /// 0–100 Fibonacci confluence score.
+    pub confluence: f64,
+}
+
+impl MarketStructure {
+    pub fn new(swing_len: usize, atr_mult_min: f64) -> Self {
+        let maxlen = swing_len * 4 + 10;
+        Self {
+            swing_len,
+            atr_mult: atr_mult_min,
+            maxlen,
+            highs:  VecDeque::with_capacity(maxlen),
+            lows:   VecDeque::with_capacity(maxlen),
+            closes: VecDeque::with_capacity(maxlen),
+            swing_hi: None,
+            swing_lo: None,
+            prev_swing_hi: None,
+            prev_swing_lo: None,
+            atr: None,
+            bias_internal: 0,
+            fib_hi: None,
+            fib_lo: None,
+            fib_dir: 0,
+            last_broken_hi: None,
+            last_broken_lo: None,
+            bias: 0,
+            fib618: None,
+            fib500: None,
+            fib382: None,
+            fib786: None,
+            in_discount: false,
+            in_premium: false,
+            bos: false,
+            choch: false,
+            choch_dir: 0,
+            confluence: 0.0,
+        }
+    }
+
+    pub fn update(&mut self, candle: &Candle) {
+        if self.highs.len() == self.maxlen { self.highs.pop_front(); }
+        if self.lows.len()  == self.maxlen { self.lows.pop_front(); }
+        if self.closes.len()== self.maxlen { self.closes.pop_front(); }
+        self.highs.push_back(candle.high);
+        self.lows.push_back(candle.low);
+        self.closes.push_back(candle.close);
+
+        // ATR (Wilder 1/14)
+        let prev_c = if self.closes.len() >= 2 {
+            *self.closes.iter().rev().nth(1).unwrap()
+        } else { candle.close };
+        let tr = (candle.high - candle.low)
+            .max((candle.high - prev_c).abs())
+            .max((candle.low  - prev_c).abs());
+        self.atr = Some(match self.atr {
+            None => tr,
+            Some(prev) => prev / 14.0 + tr * (1.0 - 1.0 / 14.0),
+        });
+        let atr = self.atr.unwrap_or(1e-9).max(1e-9);
+
+        let ph = self.pivot_high();
+        let pl = self.pivot_low();
+
+        self.bos   = false;
+        self.choch = false;
+        self.choch_dir = 0;
+
+        if let Some(ph_val) = ph {
+            let atr_ok = self.swing_lo.map_or(true, |slo| (ph_val - slo) >= atr * self.atr_mult);
+            if atr_ok {
+                self.prev_swing_hi = self.swing_hi;
+                self.swing_hi = Some(ph_val);
+            }
+        }
+        if let Some(pl_val) = pl {
+            let atr_ok = self.swing_hi.map_or(true, |shi| (shi - pl_val) >= atr * self.atr_mult);
+            if atr_ok {
+                self.prev_swing_lo = self.swing_lo;
+                self.swing_lo = Some(pl_val);
+            }
+        }
+
+        let cl = candle.close;
+
+        if let Some(shi) = self.swing_hi {
+            if cl > shi && self.last_broken_hi != Some(shi) {
+                if self.bias_internal <= 0 {
+                    self.choch = true;
+                    self.choch_dir = 1;
+                    self.fib_dir = 1;
+                    self.fib_hi = Some(candle.high);
+                    self.fib_lo = self.swing_lo;
+                } else {
+                    self.bos = true;
+                    self.fib_hi = Some(candle.high);
+                    self.fib_lo = self.swing_lo;
+                    self.fib_dir = 1;
+                }
+                self.bias_internal = 1;
+                self.last_broken_hi = Some(shi);
+            }
+        }
+        if let Some(slo) = self.swing_lo {
+            if cl < slo && self.last_broken_lo != Some(slo) {
+                if self.bias_internal >= 0 {
+                    self.choch = true;
+                    self.choch_dir = -1;
+                    self.fib_dir = -1;
+                    self.fib_lo = Some(candle.low);
+                    self.fib_hi = self.swing_hi;
+                } else {
+                    self.bos = true;
+                    self.fib_lo = Some(candle.low);
+                    self.fib_hi = self.swing_hi;
+                    self.fib_dir = -1;
+                }
+                self.bias_internal = -1;
+                self.last_broken_lo = Some(slo);
+            }
+        }
+
+        self.bias = self.bias_internal;
+
+        if let (Some(fh), Some(fl)) = (self.fib_hi, self.fib_lo) {
+            if self.fib_dir != 0 {
+                self.compute_fibs(fh, fl, self.fib_dir);
+            }
+        }
+
+        if let (Some(f5), dir) = (self.fib500, self.fib_dir) {
+            if dir != 0 {
+                if dir == 1 {
+                    self.in_discount = cl <= f5;
+                    self.in_premium  = cl >  f5;
+                } else {
+                    self.in_premium  = cl >= f5;
+                    self.in_discount = cl <  f5;
+                }
+            }
+        } else {
+            self.in_discount = false;
+            self.in_premium  = false;
+        }
+
+        // Fibonacci confluence score
+        let tol = atr * 0.3;
+        let mut score = 0.0_f64;
+        if self.fib382.map_or(false, |f| (cl - f).abs() < tol) { score += 1.5; }
+        if self.fib500.map_or(false, |f| (cl - f).abs() < tol) { score += 2.0; }
+        if self.fib618.map_or(false, |f| (cl - f).abs() < tol) { score += 2.5; }
+        if self.fib786.map_or(false, |f| (cl - f).abs() < tol) { score += 1.5; }
+        self.confluence = (score * 10.0).min(100.0);
+    }
+
+    fn pivot_high(&self) -> Option<f64> {
+        let arr: Vec<f64> = self.highs.iter().copied().collect();
+        let n = self.swing_len;
+        if arr.len() < 2 * n + 1 { return None; }
+        let mid = arr[arr.len() - n - 1];
+        let left_ok  = (1..=n).all(|i| mid >= arr[arr.len() - n - 1 - i]);
+        let right_ok = (1..=n).all(|i| mid >= arr[arr.len() - n - 1 + i]);
+        if left_ok && right_ok { Some(mid) } else { None }
+    }
+
+    fn pivot_low(&self) -> Option<f64> {
+        let arr: Vec<f64> = self.lows.iter().copied().collect();
+        let n = self.swing_len;
+        if arr.len() < 2 * n + 1 { return None; }
+        let mid = arr[arr.len() - n - 1];
+        let left_ok  = (1..=n).all(|i| mid <= arr[arr.len() - n - 1 - i]);
+        let right_ok = (1..=n).all(|i| mid <= arr[arr.len() - n - 1 + i]);
+        if left_ok && right_ok { Some(mid) } else { None }
+    }
+
+    fn compute_fibs(&mut self, hi: f64, lo: f64, direction: i8) {
+        let rng = hi - lo;
+        if rng <= 0.0 { return; }
+        if direction == 1 {
+            self.fib382 = Some(hi - rng * 0.382);
+            self.fib500 = Some(hi - rng * 0.500);
+            self.fib618 = Some(hi - rng * 0.618);
+            self.fib786 = Some(hi - rng * 0.786);
+        } else {
+            self.fib382 = Some(lo + rng * 0.382);
+            self.fib500 = Some(lo + rng * 0.500);
+            self.fib618 = Some(lo + rng * 0.618);
+            self.fib786 = Some(lo + rng * 0.786);
+        }
+    }
+}
