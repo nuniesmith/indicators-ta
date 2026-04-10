@@ -3,6 +3,12 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use crate::functions::IndicatorError;
+
+// ── MACD
+pub type TripleVec = (Vec<f64>, Vec<f64>, Vec<f64>);
+pub type MacdResult = Result<TripleVec, IndicatorError>;
+
 // ── Candle ────────────────────────────────────────────────────────────────────
 
 /// One OHLCV bar.
@@ -22,7 +28,7 @@ impl Candle {
     /// where every element is a JSON string.
     pub fn from_raw(row: &[serde_json::Value]) -> Option<Self> {
         Some(Self {
-            time: row.get(0)?.as_str()?.parse().ok()?,
+            time: row.first()?.as_str()?.parse().ok()?,
             open: row.get(1)?.as_str()?.parse().ok()?,
             high: row.get(2)?.as_str()?.parse().ok()?,
             low: row.get(3)?.as_str()?.parse().ok()?,

@@ -122,7 +122,7 @@ impl std::fmt::Display for EnsembleResult {
 /// # Example
 ///
 /// ```rust
-/// use regime::{EnsembleRegimeDetector, EnsembleConfig, RegimeConfig, MarketRegime};
+/// use indicators::{EnsembleRegimeDetector, EnsembleConfig, RegimeConfig, MarketRegime};
 ///
 /// let mut ensemble = EnsembleRegimeDetector::default_config();
 ///
@@ -257,9 +257,9 @@ impl EnsembleRegimeDetector {
     fn regimes_agree_direction(r1: MarketRegime, r2: MarketRegime) -> bool {
         match (r1, r2) {
             (MarketRegime::Trending(d1), MarketRegime::Trending(d2)) => d1 == d2,
-            (MarketRegime::MeanReverting, MarketRegime::MeanReverting) => true,
-            (MarketRegime::Volatile, MarketRegime::Volatile) => true,
-            (MarketRegime::Uncertain, MarketRegime::Uncertain) => true,
+            (MarketRegime::MeanReverting, MarketRegime::MeanReverting)
+            | (MarketRegime::Volatile, MarketRegime::Volatile)
+            | (MarketRegime::Uncertain, MarketRegime::Uncertain) => true,
             _ => false,
         }
     }

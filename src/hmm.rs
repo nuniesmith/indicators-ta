@@ -129,7 +129,7 @@ impl GaussianState {
 /// # Example
 ///
 /// ```rust
-/// use regime::{HMMRegimeDetector, HMMConfig, MarketRegime};
+/// use indicators::{HMMRegimeDetector, HMMConfig, MarketRegime};
 ///
 /// let mut detector = HMMRegimeDetector::crypto_optimized();
 ///

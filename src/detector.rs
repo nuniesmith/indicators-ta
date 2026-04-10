@@ -23,7 +23,7 @@ use std::collections::VecDeque;
 /// # Example
 ///
 /// ```rust
-/// use regime::{RegimeDetector, RegimeConfig, MarketRegime};
+/// use indicators::{RegimeDetector, RegimeConfig, MarketRegime};
 ///
 /// let mut detector = RegimeDetector::crypto_optimized();
 ///
@@ -149,9 +149,8 @@ impl RegimeDetector {
             adx_value.unwrap(),
             bb_values
                 .as_ref()
-                .map(|b| b.width_percentile)
-                .unwrap_or(50.0),
-            self.calculate_trend_strength(ema_short.unwrap(), ema_long.unwrap(), close),
+                .map_or(50.0, |b| b.width_percentile),
+            Self::calculate_trend_strength(ema_short.unwrap(), ema_long.unwrap(), close),
         )
     }
 
@@ -224,8 +223,8 @@ impl RegimeDetector {
         }
 
         // Determine regime and direction
-        let _max_score = trending_score.max(ranging_score).max(volatile_score);
-        let confidence = _max_score / 1.2; // Normalize to 0-1 range
+        let max_score = trending_score.max(ranging_score).max(volatile_score);
+        let confidence = max_score / 1.2; // Normalize to 0-1 range
 
         let regime = if volatile_score >= 0.5 && volatile_score >= trending_score {
             MarketRegime::Volatile
@@ -297,7 +296,7 @@ impl RegimeDetector {
     }
 
     /// Calculate trend strength from EMA alignment and price position
-    fn calculate_trend_strength(&self, ema_short: f64, ema_long: f64, close: f64) -> f64 {
+    fn calculate_trend_strength(ema_short: f64, ema_long: f64, close: f64) -> f64 {
         let ema_alignment = (ema_short - ema_long).abs() / ema_long * 100.0;
         let price_position = if close > ema_short && close > ema_long {
             1.0

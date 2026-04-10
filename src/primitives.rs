@@ -143,16 +143,13 @@ impl ATR {
 
         if self.values.len() >= self.period {
             // Use Wilder's smoothing method
-            match self.current_atr {
-                Some(prev_atr) => {
-                    let new_atr =
-                        (prev_atr * (self.period - 1) as f64 + true_range) / self.period as f64;
-                    self.current_atr = Some(new_atr);
-                }
-                None => {
-                    let sum: f64 = self.values.iter().sum();
-                    self.current_atr = Some(sum / self.period as f64);
-                }
+            if let Some(prev_atr) = self.current_atr {
+                let new_atr =
+                    (prev_atr * (self.period - 1) as f64 + true_range) / self.period as f64;
+                self.current_atr = Some(new_atr);
+            } else {
+                let sum: f64 = self.values.iter().sum();
+                self.current_atr = Some(sum / self.period as f64);
             }
         }
 
@@ -279,16 +276,13 @@ impl ADX {
 
                 // Calculate ADX as smoothed DX
                 if self.dx_values.len() >= self.period {
-                    match self.current_adx {
-                        Some(prev_adx) => {
-                            let new_adx =
-                                (prev_adx * (self.period - 1) as f64 + dx) / self.period as f64;
-                            self.current_adx = Some(new_adx);
-                        }
-                        None => {
-                            let sum: f64 = self.dx_values.iter().sum();
-                            self.current_adx = Some(sum / self.period as f64);
-                        }
+                    if let Some(prev_adx) = self.current_adx {
+                        let new_adx =
+                            (prev_adx * (self.period - 1) as f64 + dx) / self.period as f64;
+                        self.current_adx = Some(new_adx);
+                    } else {
+                        let sum: f64 = self.dx_values.iter().sum();
+                        self.current_adx = Some(sum / self.period as f64);
                     }
                 }
             }

@@ -18,15 +18,11 @@ serde_json = "1.0"
 chrono     = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
-rand = "0.10.0"
+rand = "0.8"
 
 [lib]
 name = "indicators"
 path = "src/lib.rs"
-
-# ============================================================================
-# Profile Configuration
-# ============================================================================
 
 [profile.dev]
 opt-level = 0
@@ -50,10 +46,6 @@ inherits      = "release"
 lto           = false
 codegen-units = 256
 
-# ============================================================================
-# Lints
-# ============================================================================
-
 [lints.rust]
 unsafe_code  = "warn"
 missing_docs = "allow"
@@ -62,7 +54,52 @@ missing_docs = "allow"
 all      = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
 nursery  = { level = "warn", priority = -1 }
+
+# ── Allowed: documented design decisions ───────────────────────────────────
 missing_errors_doc      = "allow"
 missing_panics_doc      = "allow"
 module_name_repetitions = "allow"
 must_use_candidate      = "allow"
+
+# Numeric casts: usize->f64 for period values are always < 2^52 in practice.
+cast_precision_loss      = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss           = "allow"
+cast_lossless            = "allow"
+
+# mul_add changes semantics in edge-cases; arithmetic is correct as written.
+suboptimal_flops = "allow"
+
+# Exact float comparisons in tests compare values we computed ourselves.
+float_cmp = "allow"
+
+# f64::midpoint stabilised in Rust 1.85; our MSRV is 1.82.
+manual_midpoint = "allow"
+
+# Volume accumulation loop — float comparison is the natural idiom.
+while_float = "allow"
+
+# Indicator structs carry orthogonal boolean flags, not reducible to enums.
+struct_excessive_bools = "allow"
+
+# Multi-layer signal pipeline; splitting would harm readability.
+too_many_lines     = "allow"
+too_many_arguments = "allow"
+
+# Negated conditions are sometimes clearer in context.
+if_not_else = "allow"
+
+# if-let is often more readable than chained map_or for complex bodies.
+option_if_let_else = "allow"
+
+# Trivial getters; const annotation prevents future body additions.
+missing_const_for_fn = "allow"
+
+# Existing code uses TypeName:: consistently within files.
+use_self = "allow"
+
+# Domain terms (SuperTrend, KMeans, CHoCH) are not code identifiers.
+doc_markdown = "allow"
+
+# HMMConfig passed by value; changing to ref complicates builder call sites.
+needless_pass_by_value = "allow"

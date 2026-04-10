@@ -64,8 +64,7 @@ fn hurst_scalar(closes: &[f64], max_lag: usize) -> f64 {
             if chunk.len() < 2 {
                 continue;
             }
-            #[allow(unused_variables)]
-            let mean = chunk.iter().sum::<f64>() / chunk.len() as f64;
+            let _mean = chunk.iter().sum::<f64>() / chunk.len() as f64;
             let rets: Vec<f64> = chunk.windows(2).map(|w| w[1] - w[0]).collect();
             let ret_mean = rets.iter().sum::<f64>() / rets.len() as f64;
             let devs: Vec<f64> = {
@@ -77,8 +76,8 @@ fn hurst_scalar(closes: &[f64], max_lag: usize) -> f64 {
                     })
                     .collect()
             };
-            let r = devs.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
-                - devs.iter().cloned().fold(f64::INFINITY, f64::min);
+            let r = devs.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+                - devs.iter().copied().fold(f64::INFINITY, f64::min);
             let ddof = rets.len() as f64 - 1.0;
             let s = if ddof > 0.0 {
                 let var = rets.iter().map(|&x| (x - ret_mean).powi(2)).sum::<f64>() / ddof;
@@ -347,8 +346,7 @@ impl Indicators {
             .iter()
             .enumerate()
             .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-            .map(|(i, _)| i)
-            .unwrap_or(1);
+            .map_or(1, |(i, _)| i);
         [c_h, c_m, c_l][self.cluster]
     }
 
@@ -373,8 +371,8 @@ impl Indicators {
             atr_w.push(alpha * trs[i] + (1.0 - alpha) * atr_w[i - 1]);
         }
 
-        let lo = atr_w.iter().cloned().fold(f64::INFINITY, f64::min);
-        let hi = atr_w.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let lo = atr_w.iter().copied().fold(f64::INFINITY, f64::min);
+        let hi = atr_w.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         let rng = if (hi - lo).abs() > 1e-9 {
             hi - lo
         } else {
@@ -393,8 +391,7 @@ impl Indicators {
                     .iter()
                     .enumerate()
                     .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-                    .map(|(i, _)| i)
-                    .unwrap_or(1);
+                    .map_or(1, |(i, _)| i);
                 g[idx].push(v);
             }
             let nh = if g[0].is_empty() {
@@ -479,7 +476,7 @@ impl Indicators {
         let max_abs = self
             .max_abs_buf
             .iter()
-            .cloned()
+            .copied()
             .fold(f64::NEG_INFINITY, f64::max)
             .max(1.0);
         let cd_norm = (abs_cd + max_abs) / (2.0 * max_abs);
@@ -493,7 +490,7 @@ impl Indicators {
         let max_d = self
             .delta_buf
             .iter()
-            .cloned()
+            .copied()
             .fold(f64::NEG_INFINITY, f64::max)
             .max(1.0);
         let accel = delta / max_d;
@@ -547,12 +544,12 @@ impl Indicators {
         let sp_min = self
             .speed_norm
             .iter()
-            .cloned()
+            .copied()
             .fold(f64::INFINITY, f64::min);
         let sp_max = self
             .speed_norm
             .iter()
-            .cloned()
+            .copied()
             .fold(f64::NEG_INFINITY, f64::max);
         let sp_rng = if (sp_max - sp_min).abs() > 1e-9 {
             sp_max - sp_min

@@ -7,6 +7,8 @@ use std::collections::VecDeque;
 use std::error::Error;
 use std::fmt;
 
+use crate::types::MacdResult;
+
 // ── Error ────────────────────────────────────────────────────────────────────
 
 #[derive(Debug)]
@@ -23,11 +25,10 @@ impl fmt::Display for IndicatorError {
                 available,
             } => write!(
                 f,
-                "Insufficient data: required {} candles, but only {} available",
-                required, available
+                "Insufficient data: required {required} candles, but only {available} available"
             ),
             IndicatorError::InvalidParameter { name, value } => {
-                write!(f, "Invalid parameter {}: {}", name, value)
+                write!(f, "Invalid parameter {name}: {value}")
             }
         }
     }
@@ -154,7 +155,7 @@ pub fn macd(
     fast_period: usize,
     slow_period: usize,
     signal_period: usize,
-) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>), IndicatorError> {
+) -> MacdResult {
     let fast_ema = ema(prices, fast_period)?;
     let slow_ema = ema(prices, slow_period)?;
     let mut macd_line = vec![f64::NAN; prices.len()];

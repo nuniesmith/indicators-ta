@@ -1,4 +1,4 @@
-//! Layer 6 — Confluence Engine ("Precision Sniper").
+//! Confluence Engine.
 //!
 //! Scores bullish/bearish confluence from EMA stack, MACD, RSI, ADX, and volume.
 

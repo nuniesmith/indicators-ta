@@ -43,9 +43,7 @@ impl CVDTracker {
     }
 
     pub fn update(&mut self, candle: &Candle) {
-        let dt: DateTime<Utc> = Utc
-            .timestamp_millis_opt(candle.time)
-            .single()
+        let dt: DateTime<Utc> = Utc.timestamp_millis_opt(candle.time).single()
             .unwrap_or_else(Utc::now);
         let date = dt.date_naive();
 
@@ -65,12 +63,8 @@ impl CVDTracker {
         self.cvd = self.day_cvd;
 
         let cap = self.cvd_hist.capacity();
-        if self.cvd_hist.len() == cap {
-            self.cvd_hist.pop_front();
-        }
-        if self.price_hist.len() == cap {
-            self.price_hist.pop_front();
-        }
+        if self.cvd_hist.len() == cap { self.cvd_hist.pop_front(); }
+        if self.price_hist.len() == cap { self.price_hist.pop_front(); }
         self.cvd_hist.push_back(self.cvd);
         self.price_hist.push_back(candle.close);
 
@@ -84,31 +78,22 @@ impl CVDTracker {
 
     fn check_divergence(&self) -> i8 {
         let n = self.cvd_hist.len().min(self.div_lookback);
-        if n < 10 {
-            return 0;
-        }
+        if n < 10 { return 0; }
         let prices: Vec<f64> = self.price_hist.iter().rev().take(n).copied().collect();
-        let cvds: Vec<f64> = self.cvd_hist.iter().rev().take(n).copied().collect();
+        let cvds:   Vec<f64> = self.cvd_hist.iter().rev().take(n).copied().collect();
 
         let last_p = prices[0];
         let last_c = cvds[0];
 
         // Bullish divergence: price at new low but CVD is not
-        let min_p = prices[1..].iter().cloned().fold(f64::INFINITY, f64::min);
-        let min_c = cvds[1..].iter().cloned().fold(f64::INFINITY, f64::min);
-        if last_p < min_p && last_c > min_c {
-            return 1;
-        }
+        let min_p = prices[1..].iter().copied().fold(f64::INFINITY, f64::min);
+        let min_c = cvds[1..].iter().copied().fold(f64::INFINITY, f64::min);
+        if last_p < min_p && last_c > min_c { return 1; }
 
         // Bearish divergence: price at new high but CVD is not
-        let max_p = prices[1..]
-            .iter()
-            .cloned()
-            .fold(f64::NEG_INFINITY, f64::max);
-        let max_c = cvds[1..].iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        if last_p > max_p && last_c < max_c {
-            return -1;
-        }
+        let max_p = prices[1..].iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let max_c = cvds[1..].iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        if last_p > max_p && last_c < max_c { return -1; }
 
         0
     }

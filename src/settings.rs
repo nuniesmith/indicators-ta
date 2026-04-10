@@ -198,7 +198,6 @@ impl BotSettings {
 /// Contract multiplier (base asset per contract).
 pub fn contract_value(symbol: &str) -> f64 {
     match symbol {
-        "XBTUSDTM" => 0.001,
         "ETHUSDTM" => 0.01,
         "SOLUSDTM" => 1.0,
         _ => 0.001,

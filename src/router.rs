@@ -154,7 +154,7 @@ impl std::fmt::Display for RoutedSignal {
         }
 
         if let Some(dur) = self.expected_duration {
-            write!(f, " | ExpDur: {:.0} bars", dur)?;
+            write!(f, " | ExpDur: {dur:.0} bars")?;
         }
 
         Ok(())
@@ -199,7 +199,7 @@ struct AssetState {
 /// # Example
 ///
 /// ```rust
-/// use regime::router::{EnhancedRouter, EnhancedRouterConfig, ActiveStrategy};
+/// use indicators::{EnhancedRouter, EnhancedRouterConfig, ActiveStrategy};
 ///
 /// let mut router = EnhancedRouter::with_ensemble();
 /// router.register_asset("BTC/USD");
@@ -516,14 +516,11 @@ impl EnhancedRouter {
 
     /// Check if detector is warmed up for an asset
     pub fn is_ready(&self, symbol: &str) -> bool {
-        self.assets
-            .get(symbol)
-            .map(|s| match &s.detector {
-                Detector::Indicator(d) => d.is_ready(),
-                Detector::HMM(d) => d.is_ready(),
-                Detector::Ensemble(d) => d.is_ready(),
-            })
-            .unwrap_or(false)
+        self.assets.get(symbol).is_some_and(|s| match &s.detector {
+            Detector::Indicator(d) => d.is_ready(),
+            Detector::HMM(d) => d.is_ready(),
+            Detector::Ensemble(d) => d.is_ready(),
+        })
     }
 
     /// Get detection method being used
@@ -533,15 +530,12 @@ impl EnhancedRouter {
 
     /// Get regime change count for an asset
     pub fn regime_changes(&self, symbol: &str) -> u32 {
-        self.assets
-            .get(symbol)
-            .map(|s| s.regime_change_count)
-            .unwrap_or(0)
+        self.assets.get(symbol).map_or(0, |s| s.regime_change_count)
     }
 
     /// Get all registered asset symbols
     pub fn registered_assets(&self) -> Vec<&str> {
-        self.assets.keys().map(|s| s.as_str()).collect()
+        self.assets.keys().map(String::as_str).collect()
     }
 
     /// Get the router configuration
@@ -915,7 +909,7 @@ mod tests {
         assert!(display.contains("BTC/USD"));
         assert!(display.contains("Trending"));
         assert!(display.contains("Trend Following"));
-        assert!(display.contains("3"));
+        assert!(display.contains("{regime_changes}"));
     }
 
     #[test]
