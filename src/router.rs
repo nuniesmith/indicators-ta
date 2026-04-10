@@ -909,7 +909,6 @@ mod tests {
         assert!(display.contains("BTC/USD"));
         assert!(display.contains("Trending"));
         assert!(display.contains("Trend Following"));
-        assert!(display.contains("{regime_changes}"));
     }
 
     #[test]

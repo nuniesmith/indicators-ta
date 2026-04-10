@@ -199,8 +199,8 @@ pub struct ADX {
     prev_high: Option<f64>,
     prev_low: Option<f64>,
     current_adx: Option<f64>,
-    plus_di: Option<f64>,
-    minus_di: Option<f64>,
+    plus_dir_index: Option<f64>,
+    minus_dir_index: Option<f64>,
 }
 
 impl ADX {
@@ -215,8 +215,8 @@ impl ADX {
             prev_high: None,
             prev_low: None,
             current_adx: None,
-            plus_di: None,
-            minus_di: None,
+            plus_dir_index: None,
+            minus_dir_index: None,
         }
     }
 
@@ -260,15 +260,15 @@ impl ADX {
             (atr, smoothed_plus_dm, smoothed_minus_dm)
             && atr_val > 0.0
         {
-            let plus_di = (plus_dm_smooth / atr_val) * 100.0;
-            let minus_di = (minus_dm_smooth / atr_val) * 100.0;
-            self.plus_di = Some(plus_di);
-            self.minus_di = Some(minus_di);
+            let plus_dir_index = (plus_dm_smooth / atr_val) * 100.0;
+            let minus_dir_index = (minus_dm_smooth / atr_val) * 100.0;
+            self.plus_dir_index = Some(plus_dir_index);
+            self.minus_dir_index = Some(minus_dir_index);
 
             // Calculate DX
-            let di_sum = plus_di + minus_di;
+            let di_sum = plus_dir_index + minus_dir_index;
             if di_sum > 0.0 {
-                let di_diff = (plus_di - minus_di).abs();
+                let di_diff = (plus_dir_index - minus_dir_index).abs();
                 let dx = (di_diff / di_sum) * 100.0;
 
                 self.dx_values.push_back(dx);
@@ -299,13 +299,13 @@ impl ADX {
     }
 
     /// Get the +DI value
-    pub fn plus_di(&self) -> Option<f64> {
-        self.plus_di
+    pub fn plus_dir_index(&self) -> Option<f64> {
+        self.plus_dir_index
     }
 
     /// Get the -DI value
-    pub fn minus_di(&self) -> Option<f64> {
-        self.minus_di
+    pub fn minus_dir_index(&self) -> Option<f64> {
+        self.minus_dir_index
     }
 
     /// Returns trend direction based on DI crossover.
@@ -313,7 +313,7 @@ impl ADX {
     /// - `+DI > -DI` → Bullish
     /// - `-DI > +DI` → Bearish
     pub fn trend_direction(&self) -> Option<TrendDirection> {
-        match (self.plus_di, self.minus_di) {
+        match (self.plus_dir_index, self.minus_dir_index) {
             (Some(plus), Some(minus)) => {
                 if plus > minus {
                     Some(TrendDirection::Bullish)
@@ -344,8 +344,8 @@ impl ADX {
         self.prev_high = None;
         self.prev_low = None;
         self.current_adx = None;
-        self.plus_di = None;
-        self.minus_di = None;
+        self.plus_dir_index = None;
+        self.minus_dir_index = None;
     }
 }
 
@@ -815,7 +815,7 @@ mod tests {
         }
 
         // In an uptrend, +DI should be higher than -DI
-        if let (Some(plus), Some(minus)) = (adx.plus_di(), adx.minus_di()) {
+        if let (Some(plus), Some(minus)) = (adx.plus_dir_index(), adx.minus_dir_index()) {
             assert!(
                 plus > minus,
                 "+DI ({plus}) should be > -DI ({minus}) in uptrend"
@@ -835,8 +835,8 @@ mod tests {
         adx.reset();
         assert!(!adx.is_ready());
         assert!(adx.value().is_none());
-        assert!(adx.plus_di().is_none());
-        assert!(adx.minus_di().is_none());
+        assert!(adx.plus_dir_index().is_none());
+        assert!(adx.minus_dir_index().is_none());
     }
 
     // --- Bollinger Bands Tests ---
