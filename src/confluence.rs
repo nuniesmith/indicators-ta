@@ -6,16 +6,16 @@ use crate::types::Candle;
 use std::collections::VecDeque;
 
 pub struct ConfluenceEngine {
-    fast_len:  usize,
-    slow_len:  usize,
+    fast_len: usize,
+    slow_len: usize,
     trend_len: usize,
-    rsi_len:   usize,
-    adx_len:   usize,
+    rsi_len: usize,
+    adx_len: usize,
 
-    closes:  VecDeque<f64>,
+    closes: VecDeque<f64>,
     volumes: VecDeque<f64>,
-    highs:   VecDeque<f64>,
-    lows:    VecDeque<f64>,
+    highs: VecDeque<f64>,
+    lows: VecDeque<f64>,
 
     // EMAs
     ema_f: Option<f64>,
@@ -24,19 +24,19 @@ pub struct ConfluenceEngine {
     // MACD
     macd_ema12: Option<f64>,
     macd_ema26: Option<f64>,
-    macd_sig:   Option<f64>,
+    macd_sig: Option<f64>,
     // RSI (RMA)
     rsi_prev_c: Option<f64>,
-    rsi_gain:   Option<f64>,
-    rsi_loss:   Option<f64>,
+    rsi_gain: Option<f64>,
+    rsi_loss: Option<f64>,
     // ADX (RMA)
     adx_prev_h: Option<f64>,
     adx_prev_l: Option<f64>,
     adx_prev_c: Option<f64>,
-    adx_val:    Option<f64>,
-    di_plus:    Option<f64>,
-    di_minus:   Option<f64>,
-    atr_adx:    Option<f64>,
+    adx_val: Option<f64>,
+    di_plus: Option<f64>,
+    di_minus: Option<f64>,
+    atr_adx: Option<f64>,
 
     pub bull_score: f64,
     pub bear_score: f64,
@@ -48,18 +48,35 @@ impl ConfluenceEngine {
     pub fn new(fast: usize, slow: usize, trend: usize, rsi_len: usize, adx_len: usize) -> Self {
         let maxlen = (slow * 3).max(trend + 10).max(300);
         Self {
-            fast_len: fast, slow_len: slow, trend_len: trend, rsi_len, adx_len,
-            closes:  VecDeque::with_capacity(maxlen),
+            fast_len: fast,
+            slow_len: slow,
+            trend_len: trend,
+            rsi_len,
+            adx_len,
+            closes: VecDeque::with_capacity(maxlen),
             volumes: VecDeque::with_capacity(maxlen),
-            highs:   VecDeque::with_capacity(maxlen),
-            lows:    VecDeque::with_capacity(maxlen),
-            ema_f: None, ema_s: None, ema_t: None,
-            macd_ema12: None, macd_ema26: None, macd_sig: None,
-            rsi_prev_c: None, rsi_gain: None, rsi_loss: None,
-            adx_prev_h: None, adx_prev_l: None, adx_prev_c: None,
-            adx_val: None, di_plus: None, di_minus: None, atr_adx: None,
-            bull_score: 0.0, bear_score: 0.0,
-            ema_fast: None, ema_slow: None,
+            highs: VecDeque::with_capacity(maxlen),
+            lows: VecDeque::with_capacity(maxlen),
+            ema_f: None,
+            ema_s: None,
+            ema_t: None,
+            macd_ema12: None,
+            macd_ema26: None,
+            macd_sig: None,
+            rsi_prev_c: None,
+            rsi_gain: None,
+            rsi_loss: None,
+            adx_prev_h: None,
+            adx_prev_l: None,
+            adx_prev_c: None,
+            adx_val: None,
+            di_plus: None,
+            di_minus: None,
+            atr_adx: None,
+            bull_score: 0.0,
+            bear_score: 0.0,
+            ema_fast: None,
+            ema_slow: None,
         }
     }
 
@@ -83,7 +100,11 @@ impl ConfluenceEngine {
         let delta = close - prev;
         self.rsi_prev_c = Some(close);
         self.rsi_gain = Some(Self::rma_step(self.rsi_gain, delta.max(0.0), self.rsi_len));
-        self.rsi_loss = Some(Self::rma_step(self.rsi_loss, (-delta).max(0.0), self.rsi_len));
+        self.rsi_loss = Some(Self::rma_step(
+            self.rsi_loss,
+            (-delta).max(0.0),
+            self.rsi_len,
+        ));
         let gain = self.rsi_gain.unwrap_or(0.0);
         let loss = self.rsi_loss.unwrap_or(1e-9).max(1e-9);
         100.0 - 100.0 / (1.0 + gain / loss)
@@ -99,7 +120,7 @@ impl ConfluenceEngine {
         };
 
         let tr = (high - low).max((high - pc).abs()).max((low - pc).abs());
-        let up   = high - ph;
+        let up = high - ph;
         let down = pl - low;
         let dm_p = if up > down && up > 0.0 { up } else { 0.0 };
         let dm_m = if down > up && down > 0.0 { down } else { 0.0 };
@@ -107,8 +128,16 @@ impl ConfluenceEngine {
         self.atr_adx = Some(Self::rma_step(self.atr_adx, tr, self.adx_len));
         let atr = self.atr_adx.unwrap_or(1e-9).max(1e-9);
 
-        self.di_plus  = Some(Self::rma_step(self.di_plus,  dm_p / atr * 100.0, self.adx_len));
-        self.di_minus = Some(Self::rma_step(self.di_minus, dm_m / atr * 100.0, self.adx_len));
+        self.di_plus = Some(Self::rma_step(
+            self.di_plus,
+            dm_p / atr * 100.0,
+            self.adx_len,
+        ));
+        self.di_minus = Some(Self::rma_step(
+            self.di_minus,
+            dm_m / atr * 100.0,
+            self.adx_len,
+        ));
 
         let dip = self.di_plus.unwrap_or(0.0);
         let dim = self.di_minus.unwrap_or(0.0);
@@ -125,10 +154,18 @@ impl ConfluenceEngine {
         let (cl, vol, h, lo) = (candle.close, candle.volume, candle.high, candle.low);
 
         let cap = self.closes.capacity();
-        if self.closes.len() == cap { self.closes.pop_front(); }
-        if self.volumes.len() == cap { self.volumes.pop_front(); }
-        if self.highs.len()   == cap { self.highs.pop_front();  }
-        if self.lows.len()    == cap { self.lows.pop_front();   }
+        if self.closes.len() == cap {
+            self.closes.pop_front();
+        }
+        if self.volumes.len() == cap {
+            self.volumes.pop_front();
+        }
+        if self.highs.len() == cap {
+            self.highs.pop_front();
+        }
+        if self.lows.len() == cap {
+            self.lows.pop_front();
+        }
         self.closes.push_back(cl);
         self.volumes.push_back(vol);
         self.highs.push_back(h);
@@ -156,8 +193,10 @@ impl ConfluenceEngine {
         // Volume filter
         let vols: Vec<f64> = self.volumes.iter().copied().collect();
         let vol_sma = if vols.len() >= 20 {
-            vols[vols.len()-20..].iter().sum::<f64>() / 20.0
-        } else { vol };
+            vols[vols.len() - 20..].iter().sum::<f64>() / 20.0
+        } else {
+            vol
+        };
         let vol_ok = vol > vol_sma * 1.2;
 
         let ef = self.ema_f.unwrap_or(cl);
@@ -168,7 +207,11 @@ impl ConfluenceEngine {
         let mut b = 0.0_f64;
         b += if ef > es { 1.0 } else { 0.0 };
         b += if cl > et { 1.0 } else { 0.0 };
-        b += if (50.0..75.0).contains(&rsi_val) { 1.0 } else { 0.0 };
+        b += if (50.0..75.0).contains(&rsi_val) {
+            1.0
+        } else {
+            0.0
+        };
         b += if macd_hist > 0.0 { 1.0 } else { 0.0 };
         b += if macd_line > sig { 1.0 } else { 0.0 };
         b += if vol_ok { 1.0 } else { 0.0 };
@@ -179,7 +222,11 @@ impl ConfluenceEngine {
         let mut s = 0.0_f64;
         s += if ef < es { 1.0 } else { 0.0 };
         s += if cl < et { 1.0 } else { 0.0 };
-        s += if (25.0..50.0).contains(&rsi_val) { 1.0 } else { 0.0 };
+        s += if (25.0..50.0).contains(&rsi_val) {
+            1.0
+        } else {
+            0.0
+        };
         s += if macd_hist < 0.0 { 1.0 } else { 0.0 };
         s += if macd_line < sig { 1.0 } else { 0.0 };
         s += if vol_ok { 1.0 } else { 0.0 };
@@ -189,6 +236,14 @@ impl ConfluenceEngine {
     }
 
     pub fn grade(score: f64) -> &'static str {
-        if score >= 8.0 { "A+" } else if score >= 6.5 { "A" } else if score >= 5.0 { "B" } else { "C" }
+        if score >= 8.0 {
+            "A+"
+        } else if score >= 6.5 {
+            "A"
+        } else if score >= 5.0 {
+            "B"
+        } else {
+            "C"
+        }
     }
 }

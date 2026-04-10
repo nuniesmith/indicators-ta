@@ -7,7 +7,7 @@
 //! learning. It provides immediate classification once indicators are warmed up.
 //!
 
-use super::primitives::{BollingerBands, BollingerBandsValues, ADX, ATR, EMA};
+use super::primitives::{ADX, ATR, BollingerBands, BollingerBandsValues, EMA};
 use super::types::{
     MarketRegime, RecommendedStrategy, RegimeConfidence, RegimeConfig, TrendDirection,
 };

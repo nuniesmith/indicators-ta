@@ -68,21 +68,21 @@ pub use cvd::CVDTracker;
 pub use engine::Indicators;
 pub use liquidity::LiquidityProfile;
 pub use settings::BotSettings;
-pub use signal::{compute_signal, SignalComponents, SignalStreak};
+pub use signal::{SignalComponents, SignalStreak, compute_signal};
 pub use structure::MarketStructure;
 pub use vol_regime::{MarketRegimeTracker, PercentileTracker, VolatilityPercentile};
 
 // ── Re-exports: batch functions ──────────────────────────────────────────────
-pub use functions::{atr, ema, macd, rsi, sma, true_range, IndicatorError};
+pub use functions::{IndicatorError, atr, ema, macd, rsi, sma, true_range};
 
 // ── Re-exports: incremental structs ─────────────────────────────────────────
-pub use functions::{IndicatorCalculator, StrategyIndicators, ATR, EMA};
+pub use functions::{ATR, EMA, IndicatorCalculator, StrategyIndicators};
 
 // ── Re-exports: regime detection ────────────────────────────────────────────
 pub use detector::RegimeDetector;
 pub use ensemble::{EnsembleConfig, EnsembleRegimeDetector, EnsembleResult, EnsembleStatus};
 pub use hmm::{HMMConfig, HMMRegimeDetector};
-pub use primitives::{BollingerBands, BollingerBandsValues, ADX, RSI};
+pub use primitives::{ADX, BollingerBands, BollingerBandsValues, RSI};
 pub use router::{
     ActiveStrategy, AssetSummary, DetectionMethod, EnhancedRouter, EnhancedRouterConfig,
     RoutedSignal,

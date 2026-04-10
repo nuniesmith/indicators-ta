@@ -19,6 +19,7 @@ use std::collections::VecDeque;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 #[inline]
+#[allow(dead_code)]
 fn ema_step(prev: Option<f64>, val: f64, len: usize) -> f64 {
     let k = 2.0 / (len as f64 + 1.0);
     prev.map_or(val, |p| val * k + p * (1.0 - k))
@@ -63,6 +64,7 @@ fn hurst_scalar(closes: &[f64], max_lag: usize) -> f64 {
             if chunk.len() < 2 {
                 continue;
             }
+            #[allow(unused_variables)]
             let mean = chunk.iter().sum::<f64>() / chunk.len() as f64;
             let rets: Vec<f64> = chunk.windows(2).map(|w| w[1] - w[0]).collect();
             let ret_mean = rets.iter().sum::<f64>() / rets.len() as f64;

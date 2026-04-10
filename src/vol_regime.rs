@@ -18,7 +18,9 @@ pub struct PercentileTracker {
 
 impl PercentileTracker {
     pub fn new(maxlen: usize) -> Self {
-        Self { buf: VecDeque::with_capacity(maxlen) }
+        Self {
+            buf: VecDeque::with_capacity(maxlen),
+        }
     }
 
     /// Seed the buffer with alternating `lo` / `hi` values so it is never empty.
@@ -74,7 +76,9 @@ impl VolatilityPercentile {
 
     pub fn update(&mut self, atr: Option<f64>) {
         let Some(v) = atr else { return };
-        if v <= 0.0 { return; }
+        if v <= 0.0 {
+            return;
+        }
         self.tracker.push(v);
         let p = self.tracker.pct(v);
         self.vol_pct = p;
@@ -127,22 +131,36 @@ impl MarketRegimeTracker {
     pub fn update(&mut self, close: f64) {
         let prev_cl = self.closes.back().copied().unwrap_or(close);
 
-        if self.closes.len() == 220 { self.closes.pop_front(); }
+        if self.closes.len() == 220 {
+            self.closes.pop_front();
+        }
         self.closes.push_back(close);
 
-        if self.closes.len() < 200 { return; }
+        if self.closes.len() < 200 {
+            return;
+        }
 
         // 200-bar SMA
         let ma200: f64 = self.closes.iter().rev().take(200).sum::<f64>() / 200.0;
 
-        if self.ma200_hist.len() == 120 { self.ma200_hist.pop_front(); }
+        if self.ma200_hist.len() == 120 {
+            self.ma200_hist.pop_front();
+        }
         self.ma200_hist.push_back(ma200);
 
-        let ret = if prev_cl != 0.0 { (close - prev_cl) / prev_cl } else { 0.0 };
-        if self.ret_hist.len() == 110 { self.ret_hist.pop_front(); }
+        let ret = if prev_cl != 0.0 {
+            (close - prev_cl) / prev_cl
+        } else {
+            0.0
+        };
+        if self.ret_hist.len() == 110 {
+            self.ret_hist.pop_front();
+        }
         self.ret_hist.push_back(ret);
 
-        if self.ma200_hist.len() < 21 || self.ret_hist.len() < 51 { return; }
+        if self.ma200_hist.len() < 21 || self.ret_hist.len() < 51 {
+            return;
+        }
 
         // Slope of MA200 over last 20 bars, normalised by average MA change
         let ma_arr: Vec<f64> = self.ma200_hist.iter().copied().collect();
@@ -155,7 +173,9 @@ impl MarketRegimeTracker {
         };
         let slope_n = if avg_chg > 0.0 {
             (ma200 - ma_arr[ma_arr.len() - 21]) / (avg_chg * 20.0)
-        } else { 0.0 };
+        } else {
+            0.0
+        };
 
         // Return volatility
         let ret_arr: Vec<f64> = self.ret_hist.iter().copied().collect();
@@ -183,19 +203,23 @@ impl MarketRegimeTracker {
 
         self.is_trending_u = self.regime == "TRENDING↑";
         self.is_trending_d = self.regime == "TRENDING↓";
-        self.is_ranging    = self.regime == "RANGING";
-        self.is_volatile   = self.regime == "VOLATILE";
+        self.is_ranging = self.regime == "RANGING";
+        self.is_volatile = self.regime == "VOLATILE";
     }
 }
 
 impl Default for MarketRegimeTracker {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 fn std_dev(data: &[f64]) -> f64 {
-    if data.len() < 2 { return 0.0; }
+    if data.len() < 2 {
+        return 0.0;
+    }
     let mean = data.iter().sum::<f64>() / data.len() as f64;
     let var = data.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / data.len() as f64;
     var.sqrt()
