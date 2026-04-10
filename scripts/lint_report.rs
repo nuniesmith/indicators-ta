@@ -1,9 +1,10 @@
 #!/usr/bin/env rust-script
-//! lint_report — Run ruff and mypy on a source directory and write a Markdown report.
+//! lint_report — Run cargo fmt, clippy, test, and doc on a Rust workspace
+//!               and write a Markdown report.
 //!
-//! Usage: lint_report [src_dir] [output_file]
-//!   src_dir      directory to lint  (default: src)
-//!   output_file  report path        (default: lint_report.md)
+//! Usage: lint_report [workspace_dir] [output_file]
+//!   workspace_dir  root of the Rust workspace  (default: current directory)
+//!   output_file    report path                  (default: lint_report.md)
 
 use std::env;
 use std::fmt;
@@ -11,20 +12,28 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::time::Instant;
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
 #[derive(Debug)]
 struct ToolResult {
+    /// Combined stdout + stderr output from the tool.
     output: String,
+    /// True if the process exited with code 0.
     exit_ok: bool,
-    issue_count: usize,
+    /// Number of `error[...]` lines in the output.
+    error_count: usize,
+    /// Number of `warning[...]` lines in the output.
+    warning_count: usize,
+    /// Wall-clock duration in seconds.
+    elapsed_secs: f64,
 }
 
 #[derive(Debug)]
 enum AppError {
     MissingTool(String),
-    MissingSourceDir(String),
+    MissingWorkspaceDir(String),
     Io(io::Error),
 }
 
@@ -33,11 +42,11 @@ impl fmt::Display for AppError {
         match self {
             AppError::MissingTool(name) => write!(
                 f,
-                "ERROR: '{}' not found. Install it with: pip install {}",
-                name, name
+                "ERROR: '{}' not found on PATH. Make sure Rust/Cargo is installed.",
+                name
             ),
-            AppError::MissingSourceDir(dir) => {
-                write!(f, "ERROR: Source directory '{}' not found.", dir)
+            AppError::MissingWorkspaceDir(dir) => {
+                write!(f, "ERROR: Workspace directory '{}' not found.", dir)
             }
             AppError::Io(e) => write!(f, "IO error: {}", e),
         }
@@ -52,178 +61,224 @@ impl From<io::Error> for AppError {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-/// Returns true if `tool` resolves on PATH.
 fn command_exists(tool: &str) -> bool {
-    // `which` / `where` work on Unix/Windows respectively; using `command -v`
-    // equivalent via attempting a no-op execution check via PATH lookup.
-    which(tool).is_some()
-}
-
-fn which(tool: &str) -> Option<()> {
-    // Attempt to spawn with --version or similar; simpler: just check PATH.
-    let path_var = env::var("PATH").unwrap_or_default();
-    let separator = if cfg!(windows) { ';' } else { ':' };
-    for dir in path_var.split(separator) {
-        let candidate = Path::new(dir).join(tool);
-        // Also check with .exe on Windows
-        if candidate.is_file() {
-            return Some(());
-        }
-        #[cfg(windows)]
-        {
-            let exe = Path::new(dir).join(format!("{}.exe", tool));
-            if exe.is_file() {
-                return Some(());
-            }
-        }
-    }
-    None
+    // Use `command -v` equivalent: attempt a cheap subprocess call.
+    Command::new("cargo")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok()
+        && tool == "cargo" // cargo is the only tool we need to find
 }
 
 fn check_tool(name: &str) -> Result<(), AppError> {
-    if !command_exists(name) {
+    let status = Command::new(name)
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    if status.is_err() || !status.unwrap().success() {
         return Err(AppError::MissingTool(name.to_string()));
     }
     Ok(())
 }
 
-/// Run a command against `src_dir`, capturing combined stdout + stderr.
-fn run_tool(tool: &str, src_dir: &str) -> ToolResult {
-    eprintln!("Running {} on {} …", tool, src_dir);
+/// Run a cargo subcommand in `workspace_dir`, capturing combined stdout + stderr.
+fn run_cargo(args: &[&str], workspace_dir: &str, extra_env: &[(&str, &str)]) -> ToolResult {
+    let label = args.join(" ");
+    eprintln!("  → cargo {} …", label);
 
-    let result = Command::new(tool)
-        .args(if tool == "mypy" {
-            vec![src_dir]
-        } else {
-            // ruff needs the `check` subcommand
-            vec!["check", src_dir]
-        })
+    let start = Instant::now();
+    let mut cmd = Command::new("cargo");
+    cmd.args(args)
+        .current_dir(workspace_dir)
+        // Force coloured output off so the report is clean text.
+        .env("CARGO_TERM_COLOR", "never")
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output();
+        .stderr(Stdio::piped());
 
-    match result {
+    for (k, v) in extra_env {
+        cmd.env(k, v);
+    }
+
+    match cmd.output() {
         Err(e) => ToolResult {
-            output: format!("Failed to spawn {}: {}", tool, e),
+            output: format!("Failed to spawn cargo {}: {}", label, e),
             exit_ok: false,
-            issue_count: 0,
+            error_count: 0,
+            warning_count: 0,
+            elapsed_secs: start.elapsed().as_secs_f64(),
         },
         Ok(out) => {
             let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
             let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
-            let combined = format!("{}{}", stdout, stderr);
+            // Cargo writes diagnostics to stderr; merge both for the report.
+            let combined = if stdout.is_empty() {
+                stderr
+            } else if stderr.is_empty() {
+                stdout
+            } else {
+                format!("{}\n{}", stdout.trim_end(), stderr)
+            };
             let exit_ok = out.status.success();
-            let issue_count = count_issues(&combined);
+            let (error_count, warning_count) = count_diagnostics(&combined);
             ToolResult {
                 output: combined,
                 exit_ok,
-                issue_count,
+                error_count,
+                warning_count,
+                elapsed_secs: start.elapsed().as_secs_f64(),
             }
         }
     }
 }
 
-/// Count lines that look like file-level diagnostics (contain `path:line`).
-fn count_issues(output: &str) -> usize {
-    output
-        .lines()
-        .filter(|line| {
-            // Match lines like  src/foo.py:12:3: E501 ...
-            line.contains(':')
-                && line
-                    .splitn(3, ':')
-                    .nth(1)
-                    .map(|s| s.trim().parse::<u64>().is_ok())
-                    .unwrap_or(false)
-        })
-        .count()
-}
-
-fn overall_status(ruff: &ToolResult, mypy: &ToolResult) -> &'static str {
-    if ruff.exit_ok && mypy.exit_ok {
-        "✅ Passed"
-    } else {
-        "❌ Issues found"
+/// Count `error[` and `warning[` lines in cargo's diagnostic output.
+/// Cargo uses the format: `error[E0308]: ...` and `warning: ...`
+fn count_diagnostics(output: &str) -> (usize, usize) {
+    let mut errors = 0usize;
+    let mut warnings = 0usize;
+    for line in output.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("error[") || trimmed.starts_with("error: ") {
+            errors += 1;
+        } else if trimmed.starts_with("warning[") || trimmed.starts_with("warning: ") {
+            warnings += 1;
+        }
     }
+    (errors, warnings)
 }
 
-fn tool_badge(result: &ToolResult) -> String {
+fn badge(result: &ToolResult) -> String {
     if result.exit_ok {
-        "✅ Clean".to_string()
+        "✅ Pass".to_string()
+    } else if result.error_count > 0 {
+        format!("❌ {} error(s)", result.error_count)
     } else {
-        format!("❌ {} issue(s)", result.issue_count)
+        "❌ Fail".to_string()
     }
 }
 
-fn tool_output_block(result: &ToolResult) -> &str {
+fn output_block(result: &ToolResult) -> &str {
     let trimmed = result.output.trim();
     if trimmed.is_empty() {
-        "No issues found."
+        "No output."
     } else {
         trimmed
     }
 }
 
-// ── report writer ─────────────────────────────────────────────────────────────
+fn overall_status(results: &[&ToolResult]) -> &'static str {
+    if results.iter().all(|r| r.exit_ok) {
+        "✅ All checks passed"
+    } else {
+        "❌ One or more checks failed"
+    }
+}
+
+// ── report ────────────────────────────────────────────────────────────────────
 
 fn write_report(
     path: &str,
-    src_dir: &str,
+    workspace_dir: &str,
     timestamp: &str,
-    ruff: &ToolResult,
-    mypy: &ToolResult,
+    fmt: &ToolResult,
+    clippy: &ToolResult,
+    test: &ToolResult,
+    doc: &ToolResult,
 ) -> Result<(), AppError> {
+    let all = [fmt, clippy, test, doc];
+
     let report = format!(
-        r#"# Lint Report
+        r#"# Rust Lint Report
 
 | | |
 |---|---|
 | **Generated** | {timestamp} |
-| **Source directory** | `{src_dir}` |
-| **Overall status** | {status} |
+| **Workspace** | `{workspace_dir}` |
+| **Overall** | {status} |
 
 ---
 
 ## Summary
 
-| Tool | Status | Issues |
-|------|--------|--------|
-| [ruff](https://docs.astral.sh/ruff/) | {ruff_badge} | {ruff_count} |
-| [mypy](https://mypy.readthedocs.io/) | {mypy_badge} | {mypy_count} |
+| Check | Status | Errors | Warnings | Time |
+|-------|--------|--------|----------|------|
+| `cargo fmt --check` | {fmt_badge} | {fmt_e} | {fmt_w} | {fmt_t:.2}s |
+| `cargo clippy` | {clippy_badge} | {clippy_e} | {clippy_w} | {clippy_t:.2}s |
+| `cargo test` | {test_badge} | {test_e} | {test_w} | {test_t:.2}s |
+| `cargo doc` | {doc_badge} | {doc_e} | {doc_w} | {doc_t:.2}s |
 
 ---
 
-## ruff
+## cargo fmt
 
-> Fast Python linter — style, imports, and common bugs.
-
-```
-{ruff_output}
-```
-
----
-
-## mypy
-
-> Static type checker.
+> Checks that all source files match `rustfmt` formatting rules.
+> Fix with: `cargo fmt --all`
 
 ```
-{mypy_output}
+{fmt_output}
 ```
 
 ---
 
-*Report generated by `lint_report`*
+## cargo clippy
+
+> Lints for correctness, style, and performance issues.
+> Fix with: `cargo clippy --fix`
+
+```
+{clippy_output}
+```
+
+---
+
+## cargo test
+
+> Runs the full test suite including doc-tests.
+
+```
+{test_output}
+```
+
+---
+
+## cargo doc
+
+> Verifies documentation compiles without warnings.
+
+```
+{doc_output}
+```
+
+---
+
+*Report generated by `scripts/lint_report`*
 "#,
         timestamp = timestamp,
-        src_dir = src_dir,
-        status = overall_status(ruff, mypy),
-        ruff_badge = tool_badge(ruff),
-        ruff_count = ruff.issue_count,
-        mypy_badge = tool_badge(mypy),
-        mypy_count = mypy.issue_count,
-        ruff_output = tool_output_block(ruff),
-        mypy_output = tool_output_block(mypy),
+        workspace_dir = workspace_dir,
+        status = overall_status(&all),
+        fmt_badge = badge(fmt),
+        fmt_e = fmt.error_count,
+        fmt_w = fmt.warning_count,
+        fmt_t = fmt.elapsed_secs,
+        clippy_badge = badge(clippy),
+        clippy_e = clippy.error_count,
+        clippy_w = clippy.warning_count,
+        clippy_t = clippy.elapsed_secs,
+        test_badge = badge(test),
+        test_e = test.error_count,
+        test_w = test.warning_count,
+        test_t = test.elapsed_secs,
+        doc_badge = badge(doc),
+        doc_e = doc.error_count,
+        doc_w = doc.warning_count,
+        doc_t = doc.elapsed_secs,
+        fmt_output = output_block(fmt),
+        clippy_output = output_block(clippy),
+        test_output = output_block(test),
+        doc_output = output_block(doc),
     );
 
     fs::write(path, report)?;
@@ -234,36 +289,57 @@ fn write_report(
 
 fn run() -> Result<bool, AppError> {
     let args: Vec<String> = env::args().collect();
-    let src_dir = args.get(1).map(String::as_str).unwrap_or("src");
+    let workspace_dir = args.get(1).map(String::as_str).unwrap_or(".");
     let output = args.get(2).map(String::as_str).unwrap_or("lint_report.md");
 
-    // Pre-flight checks
-    if !Path::new(src_dir).is_dir() {
-        return Err(AppError::MissingSourceDir(src_dir.to_string()));
+    if !Path::new(workspace_dir).is_dir() {
+        return Err(AppError::MissingWorkspaceDir(workspace_dir.to_string()));
     }
-    check_tool("ruff")?;
-    check_tool("mypy")?;
+    check_tool("cargo")?;
 
-    // Timestamp
-    let timestamp = {
-        // Use `date` for simplicity (avoids pulling in chrono for a CLI tool).
-        // Falls back to an empty string if unavailable.
-        Command::new("date")
-            .arg("+%Y-%m-%d %H:%M:%S")
-            .output()
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-            .unwrap_or_else(|_| "unknown".to_string())
-    };
+    // Ensure clippy and rustfmt components are present.
+    check_tool("rustfmt")?;
 
-    // Run linters
-    let ruff = run_tool("ruff", src_dir);
-    let mypy = run_tool("mypy", src_dir);
+    let timestamp = Command::new("date")
+        .arg("+%Y-%m-%d %H:%M:%S")
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
 
-    // Write report
-    write_report(output, src_dir, &timestamp, &ruff, &mypy)?;
+    eprintln!("Running Rust checks on '{}' …", workspace_dir);
+
+    // 1. Format check — fails if any file needs reformatting.
+    let fmt = run_cargo(&["fmt", "--all", "--", "--check"], workspace_dir, &[]);
+
+    // 2. Clippy — treat warnings as errors to match CI.
+    let clippy = run_cargo(
+        &["clippy", "--all-targets", "--", "-D", "warnings"],
+        workspace_dir,
+        &[("RUSTFLAGS", "-D warnings")],
+    );
+
+    // 3. Tests — full suite with all features.
+    let test = run_cargo(&["test", "--all-features"], workspace_dir, &[]);
+
+    // 4. Docs — fail on any rustdoc warning.
+    let doc = run_cargo(
+        &["doc", "--no-deps", "--all-features"],
+        workspace_dir,
+        &[("RUSTDOCFLAGS", "-D warnings")],
+    );
+
+    write_report(
+        output,
+        workspace_dir,
+        &timestamp,
+        &fmt,
+        &clippy,
+        &test,
+        &doc,
+    )?;
     eprintln!("Report written to: {}", output);
 
-    Ok(ruff.exit_ok && mypy.exit_ok)
+    Ok(fmt.exit_ok && clippy.exit_ok && test.exit_ok && doc.exit_ok)
 }
 
 fn main() {

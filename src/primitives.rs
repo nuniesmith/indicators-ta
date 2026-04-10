@@ -1031,7 +1031,10 @@ mod tests {
     #[test]
     fn test_rsi_value_cached() {
         let mut rsi = RSI::new(14);
-        assert!(rsi.value().is_none(), "value() should be None before warmup");
+        assert!(
+            rsi.value().is_none(),
+            "value() should be None before warmup"
+        );
 
         let mut last_from_update = None;
         for i in 0..30 {
@@ -1059,8 +1062,6 @@ mod tests {
         rsi.reset();
         assert!(rsi.value().is_none(), "value() should be None after reset");
     }
-
-
 
     // --- SMA Helper Test ---
 

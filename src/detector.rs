@@ -147,9 +147,7 @@ impl RegimeDetector {
             stable_regime,
             confidence,
             adx_value.unwrap(),
-            bb_values
-                .as_ref()
-                .map_or(50.0, |b| b.width_percentile),
+            bb_values.as_ref().map_or(50.0, |b| b.width_percentile),
             Self::calculate_trend_strength(ema_short.unwrap(), ema_long.unwrap(), close),
         )
     }
