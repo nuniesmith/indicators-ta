@@ -26,6 +26,10 @@ use serde::{Deserialize, Serialize};
 /// Optuna-tuned JSON files load with zero field renaming.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndicatorConfig {
+    // ── Engine Buffer ────────────────────────────────────────────────────────
+    /// Candle buffer capacity
+    pub history_candles: usize,
+
     // ── Layer 1-2: VWAP & EMA ────────────────────────────────────────────────
     pub ema_len: usize,
 
@@ -93,6 +97,7 @@ pub struct IndicatorConfig {
 impl Default for IndicatorConfig {
     fn default() -> Self {
         Self {
+            history_candles: 200,
             ema_len: 9,
             atr_len: 10,
             st_factor: 3.0,

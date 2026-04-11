@@ -22,7 +22,7 @@ use crate::indicator_config::IndicatorConfig;
 use crate::registry::param_usize;
 use crate::signal::confluence::{ConfluenceEngine, ConfluenceParams};
 use crate::signal::cvd::{CVDTracker, CvdParams};
-use crate::signal::engine::{IndicatorConfig as EngineConfig, Indicators};
+use crate::signal::engine::Indicators;
 use crate::signal::liquidity::{LiquidityParams, LiquidityProfile};
 use crate::signal::structure::{MarketStructure, StructureParams};
 use crate::signal::vol_regime::VolatilityPercentile;
@@ -42,7 +42,7 @@ use crate::types::Candle;
 /// for backtesting and registry-driven workflows.
 #[derive(Debug, Clone)]
 pub struct SignalIndicator {
-    pub engine_cfg: EngineConfig,
+    pub engine_cfg: IndicatorConfig,
     pub conf_params: ConfluenceParams,
     pub liq_params: LiquidityParams,
     pub struct_params: StructureParams,
@@ -52,7 +52,7 @@ pub struct SignalIndicator {
 
 impl SignalIndicator {
     pub fn new(
-        engine_cfg: EngineConfig,
+        engine_cfg: IndicatorConfig,
         conf_params: ConfluenceParams,
         liq_params: LiquidityParams,
         struct_params: StructureParams,
@@ -70,7 +70,7 @@ impl SignalIndicator {
     }
     pub fn with_defaults() -> Self {
         Self::new(
-            EngineConfig::default(),
+            IndicatorConfig::default(),
             ConfluenceParams::default(),
             LiquidityParams::default(),
             StructureParams::default(),
@@ -159,7 +159,7 @@ impl Indicator for SignalIndicator {
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let signal_confirm_bars = param_usize(params, "confirm_bars", 3)?;
     Ok(Box::new(SignalIndicator::new(
-        EngineConfig::default(),
+        IndicatorConfig::default(),
         ConfluenceParams::default(),
         LiquidityParams::default(),
         StructureParams::default(),

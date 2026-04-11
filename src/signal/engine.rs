@@ -15,8 +15,10 @@ use std::collections::{HashMap, VecDeque};
 
 use chrono::{NaiveDate, TimeZone, Utc};
 
+// Safely importing from your unified config file
 use crate::error::IndicatorError;
 use crate::indicator::{Indicator, IndicatorOutput};
+use crate::indicator_config::IndicatorConfig;
 use crate::registry::param_usize;
 use crate::signal::vol_regime::PercentileTracker;
 use crate::types::Candle;
@@ -107,71 +109,6 @@ pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, I
         ..IndicatorConfig::default()
     };
     Ok(Box::new(EngineIndicator::new(config)))
-}
-
-// ── Config ────────────────────────────────────────────────────────────────────
-
-/// All parameters the indicator engine needs — pure math, no runtime concerns.
-#[derive(Debug, Clone)]
-pub struct IndicatorConfig {
-    /// Candle buffer capacity (typically `history_candles`).
-    pub history_candles: usize,
-    /// Bars needed before SuperTrend is ready.
-    pub training_period: usize,
-
-    // L2
-    pub ema_len: usize,
-
-    // L3
-    pub atr_len: usize,
-    pub st_factor: f64,
-    pub highvol_pct: f64,
-    pub midvol_pct: f64,
-    pub lowvol_pct: f64,
-
-    // L4
-    pub ts_max_length: usize,
-    pub ts_accel_mult: f64,
-    pub ts_rma_len: usize,
-    pub ts_hma_len: usize,
-    pub ts_collen: usize,
-    pub ts_lookback: usize,
-    /// When `Some(t)`, a speed-exit fires if `|ts_speed| > t` against the position.
-    pub ts_speed_exit_threshold: Option<f64>,
-
-    // L9
-    pub wave_pct_l: f64,
-    pub wave_pct_s: f64,
-    pub mom_pct_min: f64,
-
-    // L10
-    pub hurst_lookback: usize,
-}
-
-impl Default for IndicatorConfig {
-    fn default() -> Self {
-        Self {
-            history_candles: 200,
-            training_period: 100,
-            ema_len: 9,
-            atr_len: 10,
-            st_factor: 3.0,
-            highvol_pct: 0.75,
-            midvol_pct: 0.50,
-            lowvol_pct: 0.25,
-            ts_max_length: 50,
-            ts_accel_mult: 5.0,
-            ts_rma_len: 10,
-            ts_hma_len: 5,
-            ts_collen: 100,
-            ts_lookback: 50,
-            ts_speed_exit_threshold: None,
-            wave_pct_l: 0.25,
-            wave_pct_s: 0.75,
-            mom_pct_min: 0.30,
-            hurst_lookback: 20,
-        }
-    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
