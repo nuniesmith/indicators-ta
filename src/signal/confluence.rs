@@ -50,7 +50,7 @@ impl ConfluenceIndicator {
 }
 
 impl Indicator for ConfluenceIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "Confluence"
     }
     fn required_len(&self) -> usize {
@@ -75,14 +75,14 @@ impl Indicator for ConfluenceIndicator {
         }
         Ok(IndicatorOutput::from_pairs([
             ("confluence_bull", bull),
-            ("confluence_bear".into(), bear),
+            ("confluence_bear", bear),
         ]))
     }
 }
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let fast_len = param_usize(params, "fast_len", 8)?;
     let slow_len = param_usize(params, "slow_len", 21)?;
     let trend_len = param_usize(params, "trend_len", 50)?;

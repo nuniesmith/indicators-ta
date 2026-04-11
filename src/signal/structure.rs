@@ -52,7 +52,7 @@ impl StructureIndicator {
 }
 
 impl Indicator for StructureIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "Structure"
     }
     /// `swing_len * 4 + 10` mirrors the internal `maxlen` in [`MarketStructure`].
@@ -89,20 +89,20 @@ impl Indicator for StructureIndicator {
         }
         Ok(IndicatorOutput::from_pairs([
             ("struct_bias", bias),
-            ("struct_fib618".into(), fib618),
-            ("struct_fib500".into(), fib500),
-            ("struct_in_discount".into(), in_discount),
-            ("struct_in_premium".into(), in_premium),
-            ("struct_bos".into(), bos),
-            ("struct_choch".into(), choch),
-            ("struct_confluence".into(), confluence),
+            ("struct_fib618", fib618),
+            ("struct_fib500", fib500),
+            ("struct_in_discount", in_discount),
+            ("struct_in_premium", in_premium),
+            ("struct_bos", bos),
+            ("struct_choch", choch),
+            ("struct_confluence", confluence),
         ]))
     }
 }
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let swing_len = param_usize(params, "swing_len", 5)?;
     let atr_mult = param_f64(params, "atr_mult", 0.5)?;
     Ok(Box::new(StructureIndicator::new(StructureParams {

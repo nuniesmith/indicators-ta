@@ -50,7 +50,7 @@ impl LiquidityIndicator {
 }
 
 impl Indicator for LiquidityIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "Liquidity"
     }
     fn required_len(&self) -> usize {
@@ -80,17 +80,17 @@ impl Indicator for LiquidityIndicator {
         }
         Ok(IndicatorOutput::from_pairs([
             ("liq_poc", poc),
-            ("liq_buy_pct".into(), buy_pct),
-            ("liq_imbalance".into(), imbalance),
-            ("liq_vah".into(), vah),
-            ("liq_val".into(), val),
+            ("liq_buy_pct", buy_pct),
+            ("liq_imbalance", imbalance),
+            ("liq_vah", vah),
+            ("liq_val", val),
         ]))
     }
 }
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 50)?;
     let n_bins = param_usize(params, "n_bins", 20)?;
     Ok(Box::new(LiquidityIndicator::new(LiquidityParams {

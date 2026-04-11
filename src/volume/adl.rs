@@ -36,7 +36,7 @@ impl Adl {
 }
 
 impl Indicator for Adl {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "ADL"
     }
     fn required_len(&self) -> usize {
@@ -72,7 +72,7 @@ impl Indicator for Adl {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(_params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(_params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(Adl::new()))
 }
 

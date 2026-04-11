@@ -50,7 +50,7 @@ impl RouterIndicator {
     }
 }
 
-fn routed_regime_id(r: &MarketRegime) -> f64 {
+fn routed_regime_id(r: MarketRegime) -> f64 {
     match r {
         MarketRegime::MeanReverting => 1.0,
         MarketRegime::Volatile => 2.0,
@@ -61,7 +61,7 @@ fn routed_regime_id(r: &MarketRegime) -> f64 {
 }
 
 impl Indicator for RouterIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "Router"
     }
     fn required_len(&self) -> usize {
@@ -84,20 +84,20 @@ impl Indicator for RouterIndicator {
             if let Some(sig) = router.update(sym, c.high, c.low, c.close) {
                 conf_out[i] = sig.confidence;
                 factor_out[i] = sig.position_factor;
-                regime_out[i] = routed_regime_id(&sig.regime);
+                regime_out[i] = routed_regime_id(sig.regime);
             }
         }
         Ok(IndicatorOutput::from_pairs([
             ("router_conf", conf_out),
-            ("router_factor".into(), factor_out),
-            ("router_regime".into(), regime_out),
+            ("router_factor", factor_out),
+            ("router_regime", regime_out),
         ]))
     }
 }
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let adx_period = param_usize(params, "adx_period", 14)?;
     let bb_period = param_usize(params, "bb_period", 20)?;
     let indicator_config = RegimeConfig {

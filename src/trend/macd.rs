@@ -59,13 +59,16 @@ impl Macd {
         Self { params }
     }
 
-    pub fn default() -> Self {
+}
+
+impl Default for Macd {
+    fn default() -> Self {
         Self::new(MacdParams::default())
     }
 }
 
 impl Indicator for Macd {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "MACD"
     }
 
@@ -102,7 +105,7 @@ impl Indicator for Macd {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(Macd::new(MacdParams {
         fast_period: crate::registry::param_usize(params, "fast_period", 12)?,
         slow_period: crate::registry::param_usize(params, "slow_period", 26)?,
@@ -122,7 +125,7 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(i, &c)| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: c,
                 high: c,
                 low: c,

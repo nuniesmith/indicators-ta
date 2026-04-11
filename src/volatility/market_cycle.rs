@@ -21,7 +21,7 @@ use crate::registry::param_usize;
 use crate::types::Candle;
 
 /// Numeric encoding for cycle phases (avoids `String` in `IndicatorOutput`).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CyclePhase {
     Markup = 1,
     Markdown = -1,
@@ -56,13 +56,16 @@ impl MarketCycle {
     pub fn new(params: MarketCycleParams) -> Self {
         Self { params }
     }
-    pub fn default() -> Self {
+}
+
+impl Default for MarketCycle {
+    fn default() -> Self {
         Self::new(MarketCycleParams::default())
     }
 }
 
 impl Indicator for MarketCycle {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "MarketCycle"
     }
     fn required_len(&self) -> usize {
@@ -99,10 +102,10 @@ impl Indicator for MarketCycle {
         for i in 1..n {
             match (phases[i - 1], phases[i]) {
                 (CyclePhase::Markdown, p) if p != CyclePhase::Markdown => {
-                    result[i] = CyclePhase::Accumulation
+                    result[i] = CyclePhase::Accumulation;
                 }
                 (CyclePhase::Markup, p) if p != CyclePhase::Markup => {
-                    result[i] = CyclePhase::Distribution
+                    result[i] = CyclePhase::Distribution;
                 }
                 _ => {}
             }
@@ -117,7 +120,7 @@ impl Indicator for MarketCycle {
     }
 }
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(MarketCycle::new(MarketCycleParams {
         momentum_period: param_usize(params, "momentum_period", 1)?,
     })))
@@ -132,7 +135,7 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(i, &c)| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: c,
                 high: c,
                 low: c,

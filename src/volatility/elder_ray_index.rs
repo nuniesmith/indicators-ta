@@ -47,7 +47,7 @@ impl ElderRayIndex {
 }
 
 impl Indicator for ElderRayIndex {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "ElderRayIndex"
     }
     fn required_len(&self) -> usize {
@@ -77,7 +77,7 @@ impl Indicator for ElderRayIndex {
     }
 }
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(ElderRayIndex::new(ElderRayParams {
         fast_period: param_usize(params, "fast_period", 14)?,
     })))
@@ -90,7 +90,7 @@ mod tests {
     fn candles(n: usize) -> Vec<Candle> {
         (0..n)
             .map(|i| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: 10.0,
                 high: 12.0,
                 low: 8.0,

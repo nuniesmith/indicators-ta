@@ -81,7 +81,7 @@ impl SignalIndicator {
 }
 
 impl Indicator for SignalIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "Signal"
     }
     fn required_len(&self) -> usize {
@@ -148,15 +148,15 @@ impl Indicator for SignalIndicator {
         }
         Ok(IndicatorOutput::from_pairs([
             ("signal", signal_out),
-            ("signal_bull_score".into(), bull_out),
-            ("signal_bear_score".into(), bear_out),
+            ("signal_bull_score", bull_out),
+            ("signal_bear_score", bear_out),
         ]))
     }
 }
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let signal_confirm_bars = param_usize(params, "confirm_bars", 3)?;
     Ok(Box::new(SignalIndicator::new(
         IndicatorConfig::default(),

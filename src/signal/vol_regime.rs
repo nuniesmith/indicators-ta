@@ -54,7 +54,7 @@ impl VolumeRegime {
 }
 
 impl Indicator for VolumeRegime {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "VolumeRegime"
     }
     fn required_len(&self) -> usize {
@@ -104,14 +104,14 @@ impl Indicator for VolumeRegime {
 
         Ok(IndicatorOutput::from_pairs([
             ("vol_pct", vol_pct),
-            ("vol_regime".into(), vol_regime),
+            ("vol_regime", vol_regime),
         ]))
     }
 }
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let atr_period = param_usize(params, "atr_period", 14)?;
     let pct_window = param_usize(params, "pct_window", 100)?;
     Ok(Box::new(VolumeRegime::new(VolumeRegimeParams {

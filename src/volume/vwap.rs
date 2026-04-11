@@ -26,17 +26,11 @@ use crate::types::Candle;
 
 // ── Params ────────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct VwapParams {
     /// Rolling window.  `None` = cumulative VWAP (session-based).
     /// Python default: `None`.
     pub period: Option<usize>,
-}
-
-impl Default for VwapParams {
-    fn default() -> Self {
-        Self { period: None }
-    }
 }
 
 // ── Indicator struct ──────────────────────────────────────────────────────────
@@ -68,7 +62,7 @@ impl Vwap {
 }
 
 impl Indicator for Vwap {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "VWAP"
     }
 
@@ -136,7 +130,7 @@ impl Indicator for Vwap {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = if params.contains_key("period") {
         Some(param_usize(params, "period", 0)?)
     } else {
@@ -156,7 +150,7 @@ mod tests {
         data.iter()
             .enumerate()
             .map(|(i, &(h, l, c, v))| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: c,
                 high: h,
                 low: l,

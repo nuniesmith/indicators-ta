@@ -44,7 +44,7 @@ impl EngineIndicator {
 }
 
 impl Indicator for EngineIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "Engine"
     }
     fn required_len(&self) -> usize {
@@ -83,29 +83,29 @@ impl Indicator for EngineIndicator {
         }
         Ok(IndicatorOutput::from_pairs([
             ("engine_vwap", vwap_out),
-            ("engine_ema".into(), ema_out),
-            ("engine_st".into(), st_out),
-            ("engine_st_dir".into(), st_dir_out),
-            ("engine_ts_norm".into(), ts_norm_out),
-            ("engine_ts_bullish".into(), ts_bullish_out),
-            ("engine_hurst".into(), hurst_out),
-            ("engine_accel".into(), accel_out),
-            ("engine_ao".into(), ao_out),
-            ("engine_dominance".into(), dominance_out),
+            ("engine_ema", ema_out),
+            ("engine_st", st_out),
+            ("engine_st_dir", st_dir_out),
+            ("engine_ts_norm", ts_norm_out),
+            ("engine_ts_bullish", ts_bullish_out),
+            ("engine_hurst", hurst_out),
+            ("engine_accel", accel_out),
+            ("engine_ao", ao_out),
+            ("engine_dominance", dominance_out),
         ]))
     }
 }
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let training_period = param_usize(params, "training_period", 100)?;
     let ema_len = param_usize(params, "ema_len", 9)?;
     let atr_len = param_usize(params, "atr_len", 10)?;
     let config = IndicatorConfig {
-        training_period,
         ema_len,
         atr_len,
+        training_period,
         ..IndicatorConfig::default()
     };
     Ok(Box::new(EngineIndicator::new(config)))

@@ -82,7 +82,7 @@ fn rolling_std(prices: &[f64], period: usize) -> Vec<f64> {
 // ── Indicator impl ────────────────────────────────────────────────────────────
 
 impl Indicator for BollingerBands {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "BollingerBands"
     }
     fn required_len(&self) -> usize {
@@ -143,7 +143,7 @@ impl Indicator for BollingerBands {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 20)?;
     let std_dev = param_f64(params, "std_dev", 2.0)?;
     let column = match param_str(params, "column", "close") {
@@ -170,7 +170,7 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(i, &c)| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: c,
                 high: c + 1.0,
                 low: c - 1.0,
@@ -213,8 +213,8 @@ mod tests {
             .calculate(&candles(&closes))
             .unwrap();
         let mid = out.get("BB_middle").unwrap();
-        for i in 0..4 {
-            assert!(mid[i].is_nan(), "expected NaN at {i}");
+        for (i, &v) in mid.iter().enumerate().take(4) {
+            assert!(v.is_nan(), "expected NaN at {i}");
         }
         assert!(!mid[4].is_nan());
     }

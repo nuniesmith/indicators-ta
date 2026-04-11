@@ -138,8 +138,8 @@ pub fn registry() -> &'static IndicatorRegistry {
 /// Parse a `usize` from the params map with a default fallback.
 ///
 /// Mirrors `self.params.get("period", 14)` in Python.
-pub fn param_usize(
-    params: &HashMap<String, String>,
+pub fn param_usize<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
     key: &str,
     default: usize,
 ) -> Result<usize, IndicatorError> {
@@ -155,8 +155,8 @@ pub fn param_usize(
 }
 
 /// Parse an `f64` from the params map with a default fallback.
-pub fn param_f64(
-    params: &HashMap<String, String>,
+pub fn param_f64<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
     key: &str,
     default: f64,
 ) -> Result<f64, IndicatorError> {
@@ -172,8 +172,8 @@ pub fn param_f64(
 }
 
 /// Parse a `String` param with a default fallback.
-pub fn param_str<'a>(params: &'a HashMap<String, String>, key: &str, default: &'a str) -> &'a str {
-    params.get(key).map(|s| s.as_str()).unwrap_or(default)
+pub fn param_str<'a, S: ::std::hash::BuildHasher>(params: &'a HashMap<String, String, S>, key: &str, default: &'a str) -> &'a str {
+    params.get(key).map_or(default, String::as_str)
 }
 
 #[cfg(test)]

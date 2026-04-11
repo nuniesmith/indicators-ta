@@ -58,13 +58,16 @@ impl SchaffTrendCycle {
     pub fn new(params: StcParams) -> Self {
         Self { params }
     }
-    pub fn default() -> Self {
+}
+
+impl Default for SchaffTrendCycle {
+    fn default() -> Self {
         Self::new(StcParams::default())
     }
 }
 
 impl Indicator for SchaffTrendCycle {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "SchaffTrendCycle"
     }
 
@@ -113,8 +116,8 @@ impl Indicator for SchaffTrendCycle {
         let mut stc = vec![f64::NAN; n];
         for i in (sp - 1)..n {
             let window = &macd_diff[(i + 1 - sp)..=i];
-            let min_d = window.iter().cloned().fold(f64::INFINITY, f64::min);
-            let max_d = window.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let min_d = window.iter().copied().fold(f64::INFINITY, f64::min);
+            let max_d = window.iter().copied().fold(f64::NEG_INFINITY, f64::max);
             let range = max_d - min_d;
             if macd_diff[i].is_nan() || range == 0.0 {
                 stc[i] = f64::NAN;
@@ -134,7 +137,7 @@ impl Indicator for SchaffTrendCycle {
     }
 }
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(SchaffTrendCycle::new(StcParams {
         short_ema: param_usize(params, "short_ema", 12)?,
         long_ema: param_usize(params, "long_ema", 26)?,
@@ -150,7 +153,7 @@ mod tests {
     fn candles(n: usize) -> Vec<Candle> {
         (0..n)
             .map(|i| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: 10.0,
                 high: 10.0 + (i % 5) as f64,
                 low: 10.0 - (i % 3) as f64,

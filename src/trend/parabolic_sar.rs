@@ -43,13 +43,16 @@ impl ParabolicSar {
     pub fn new(params: PsarParams) -> Self {
         Self { params }
     }
-    pub fn default() -> Self {
+}
+
+impl Default for ParabolicSar {
+    fn default() -> Self {
         Self::new(PsarParams::default())
     }
 }
 
 impl Indicator for ParabolicSar {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "ParabolicSAR"
     }
     fn required_len(&self) -> usize {
@@ -106,7 +109,7 @@ impl Indicator for ParabolicSar {
     }
 }
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(ParabolicSar::new(PsarParams {
         step: param_f64(params, "step", 0.02)?,
         max_step: param_f64(params, "max_step", 0.2)?,
@@ -120,7 +123,7 @@ mod tests {
     fn candles(n: usize) -> Vec<Candle> {
         (0..n)
             .map(|i| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: 10.0,
                 high: 10.0 + i as f64 * 0.1,
                 low: 10.0 - i as f64 * 0.05,

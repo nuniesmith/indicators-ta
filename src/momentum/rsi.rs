@@ -63,7 +63,7 @@ impl Rsi {
 }
 
 impl Indicator for Rsi {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "RSI"
     }
 
@@ -125,7 +125,9 @@ fn rsi_from(avg_gain: f64, avg_loss: f64) -> f64 {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 14)?;
     let column = match param_str(params, "column", "close") {
         "open" => PriceColumn::Open,
@@ -148,7 +150,7 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(i, &c)| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: c,
                 high: c,
                 low: c,
@@ -173,8 +175,8 @@ mod tests {
             .calculate(&make_candles(&prices))
             .unwrap();
         let vals = out.get("RSI_14").unwrap();
-        for i in 0..14 {
-            assert!(vals[i].is_nan(), "expected NaN at [{i}], got {}", vals[i]);
+        for (i, &v) in vals.iter().enumerate().take(14) {
+            assert!(v.is_nan(), "expected NaN at [{i}], got {v}");
         }
         assert!(!vals[14].is_nan());
     }
@@ -254,7 +256,7 @@ mod tests {
             .unwrap();
         for &v in out.get("RSI_14").unwrap() {
             if !v.is_nan() {
-                assert!(v >= 0.0 && v <= 100.0, "out of range: {v}");
+                assert!((0.0..=100.0).contains(&v), "out of range: {v}");
             }
         }
     }

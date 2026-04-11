@@ -53,7 +53,7 @@ impl ChaikinMoneyFlow {
 }
 
 impl Indicator for ChaikinMoneyFlow {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "ChaikinMoneyFlow"
     }
     fn required_len(&self) -> usize {
@@ -101,7 +101,7 @@ impl Indicator for ChaikinMoneyFlow {
     }
 }
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(ChaikinMoneyFlow::new(CmfParams {
         period: param_usize(params, "period", 20)?,
     })))
@@ -114,7 +114,7 @@ mod tests {
     fn candles(n: usize) -> Vec<Candle> {
         (0..n)
             .map(|i| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: 10.0,
                 high: 12.0,
                 low: 8.0,
@@ -139,7 +139,7 @@ mod tests {
             .unwrap();
         for &v in out.get("CMF_5").unwrap() {
             if !v.is_nan() {
-                assert!(v >= -1.0 && v <= 1.0, "out of range: {v}");
+                assert!((-1.0..=1.0).contains(&v), "out of range: {v}");
             }
         }
     }

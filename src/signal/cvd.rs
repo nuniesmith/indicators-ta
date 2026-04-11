@@ -44,7 +44,7 @@ impl CvdIndicator {
 }
 
 impl Indicator for CvdIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "CVD"
     }
     fn required_len(&self) -> usize {
@@ -70,15 +70,15 @@ impl Indicator for CvdIndicator {
         }
         Ok(IndicatorOutput::from_pairs([
             ("cvd", cvd_out),
-            ("cvd_slope".into(), slope),
-            ("cvd_div".into(), div_out),
+            ("cvd_slope", slope),
+            ("cvd_div", div_out),
         ]))
     }
 }
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let slope_bars = param_usize(params, "slope_bars", 10)?;
     let div_lookback = param_usize(params, "div_lookback", 20)?;
     Ok(Box::new(CvdIndicator::new(CvdParams {

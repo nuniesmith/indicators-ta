@@ -78,7 +78,7 @@ impl Ema {
 }
 
 impl Indicator for Ema {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "EMA"
     }
 
@@ -115,7 +115,7 @@ impl Indicator for Ema {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 20)?;
     let alpha = if params.contains_key("alpha") {
         Some(param_f64(params, "alpha", 2.0 / (period as f64 + 1.0))?)
@@ -146,7 +146,7 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(i, &c)| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: c,
                 high: c,
                 low: c,

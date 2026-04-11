@@ -45,7 +45,7 @@ impl HmmIndicator {
     }
 }
 
-fn hmm_regime_id(r: &MarketRegime) -> f64 {
+fn hmm_regime_id(r: MarketRegime) -> f64 {
     match r {
         MarketRegime::MeanReverting => 1.0,
         MarketRegime::Volatile => 2.0,
@@ -56,7 +56,7 @@ fn hmm_regime_id(r: &MarketRegime) -> f64 {
 }
 
 impl Indicator for HmmIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "HMMRegime"
     }
 
@@ -81,23 +81,23 @@ impl Indicator for HmmIndicator {
         for (i, c) in candles.iter().enumerate() {
             let rc = det.update(c.close);
             conf[i] = rc.confidence;
-            regime[i] = hmm_regime_id(&rc.regime);
+            regime[i] = hmm_regime_id(rc.regime);
         }
         Ok(IndicatorOutput::from_pairs([
             ("hmm_conf", conf),
-            ("hmm_regime_id".into(), regime),
+            ("hmm_regime_id", regime),
         ]))
     }
 }
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let min_observations = param_usize(params, "min_observations", 100)?;
     let n_states = param_usize(params, "n_states", 3)?;
     let config = HMMConfig {
-        min_observations,
         n_states,
+        min_observations,
         ..HMMConfig::default()
     };
     Ok(Box::new(HmmIndicator::new(config)))

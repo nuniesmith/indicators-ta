@@ -56,13 +56,16 @@ impl StochasticRsi {
     pub fn new(params: StochRsiParams) -> Self {
         Self { params }
     }
-    pub fn default() -> Self {
+}
+
+impl Default for StochasticRsi {
+    fn default() -> Self {
         Self::new(StochRsiParams::default())
     }
 }
 
 impl Indicator for StochasticRsi {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "StochasticRSI"
     }
 
@@ -109,8 +112,8 @@ impl Indicator for StochasticRsi {
             if window.iter().any(|v| v.is_nan()) {
                 continue;
             }
-            let min_r = window.iter().cloned().fold(f64::INFINITY, f64::min);
-            let max_r = window.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let min_r = window.iter().copied().fold(f64::INFINITY, f64::min);
+            let max_r = window.iter().copied().fold(f64::NEG_INFINITY, f64::max);
             let range = max_r - min_r;
             raw_k[i] = if range == 0.0 {
                 50.0
@@ -158,7 +161,7 @@ fn sma_of(src: &[f64], period: usize) -> Vec<f64> {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(StochasticRsi::new(StochRsiParams {
         rsi_period: param_usize(params, "rsi_period", 14)?,
         stoch_period: param_usize(params, "stoch_period", 14)?,
@@ -178,7 +181,7 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(i, &c)| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: c,
                 high: c,
                 low: c,
@@ -220,12 +223,12 @@ mod tests {
             .unwrap();
         for &v in out.get("StochRSI_K").unwrap() {
             if !v.is_nan() {
-                assert!(v >= 0.0 && v <= 100.0, "K out of range: {v}");
+                assert!((0.0..=100.0).contains(&v), "K out of range: {v}");
             }
         }
         for &v in out.get("StochRSI_D").unwrap() {
             if !v.is_nan() {
-                assert!(v >= 0.0 && v <= 100.0, "D out of range: {v}");
+                assert!((0.0..=100.0).contains(&v), "D out of range: {v}");
             }
         }
     }

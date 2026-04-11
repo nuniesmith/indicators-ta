@@ -36,7 +36,7 @@ impl AdxIndicator {
 }
 
 impl Indicator for AdxIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "ADX"
     }
     fn required_len(&self) -> usize {
@@ -62,8 +62,8 @@ impl Indicator for AdxIndicator {
         }
         Ok(IndicatorOutput::from_pairs([
             ("adx", adx_out),
-            ("di_plus".into(), dip_out),
-            ("di_minus".into(), dmi_out),
+            ("di_plus", dip_out),
+            ("di_minus", dmi_out),
         ]))
     }
 }
@@ -81,7 +81,7 @@ impl AtrPrimIndicator {
 }
 
 impl Indicator for AtrPrimIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "AtrPrim"
     }
     fn required_len(&self) -> usize {
@@ -118,7 +118,7 @@ impl EmaPrimIndicator {
 }
 
 impl Indicator for EmaPrimIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "EmaPrim"
     }
     fn required_len(&self) -> usize {
@@ -155,7 +155,7 @@ impl RsiPrimIndicator {
 }
 
 impl Indicator for RsiPrimIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "RsiPrim"
     }
     fn required_len(&self) -> usize {
@@ -195,7 +195,7 @@ impl BbPrimIndicator {
 }
 
 impl Indicator for BbPrimIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "BbPrim"
     }
     fn required_len(&self) -> usize {
@@ -223,9 +223,9 @@ impl Indicator for BbPrimIndicator {
         }
         Ok(IndicatorOutput::from_pairs([
             ("bb_upper", upper),
-            ("bb_mid".into(), mid),
-            ("bb_lower".into(), lower),
-            ("bb_width".into(), width),
+            ("bb_mid", mid),
+            ("bb_lower", lower),
+            ("bb_width", width),
         ]))
     }
 }
@@ -234,7 +234,7 @@ impl Indicator for BbPrimIndicator {
 
 /// Default factory registers as `"primitives"` → produces [`AdxIndicator`].
 /// Use the individual wrapper structs directly for EMA, ATR, RSI, or BB.
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 14)?;
     Ok(Box::new(AdxIndicator::new(period)))
 }

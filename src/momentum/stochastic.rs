@@ -57,13 +57,16 @@ impl Stochastic {
     pub fn new(params: StochParams) -> Self {
         Self { params }
     }
-    pub fn default() -> Self {
+}
+
+impl Default for Stochastic {
+    fn default() -> Self {
         Self::new(StochParams::default())
     }
 }
 
 impl Indicator for Stochastic {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "Stochastic"
     }
 
@@ -140,7 +143,7 @@ fn sma_of(src: &[f64], period: usize) -> Vec<f64> {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(Stochastic::new(StochParams {
         k_period: param_usize(params, "k_period", 14)?,
         smooth_k: param_usize(params, "smooth_k", 3)?,
@@ -159,7 +162,7 @@ mod tests {
         data.iter()
             .enumerate()
             .map(|(i, &(h, l, c))| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: c,
                 high: h,
                 low: l,
@@ -265,12 +268,12 @@ mod tests {
             .unwrap();
         for &v in out.get("Stoch_K").unwrap() {
             if !v.is_nan() {
-                assert!(v >= 0.0 && v <= 100.0, "K out of range: {v}");
+                assert!((0.0..=100.0).contains(&v), "K out of range: {v}");
             }
         }
         for &v in out.get("Stoch_D").unwrap() {
             if !v.is_nan() {
-                assert!(v >= 0.0 && v <= 100.0, "D out of range: {v}");
+                assert!((0.0..=100.0).contains(&v), "D out of range: {v}");
             }
         }
     }

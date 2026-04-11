@@ -51,7 +51,7 @@ impl ChoppinessIndex {
 }
 
 impl Indicator for ChoppinessIndex {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "ChoppinessIndex"
     }
     fn required_len(&self) -> usize {
@@ -92,7 +92,7 @@ impl Indicator for ChoppinessIndex {
     }
 }
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(ChoppinessIndex::new(ChopParams {
         period: param_usize(params, "period", 14)?,
     })))
@@ -105,7 +105,7 @@ mod tests {
     fn candles(n: usize, range: f64) -> Vec<Candle> {
         (0..n)
             .map(|i| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: 10.0,
                 high: 10.0 + range,
                 low: 10.0 - range,

@@ -79,7 +79,7 @@ impl Atr {
 }
 
 impl Indicator for Atr {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "ATR"
     }
     fn required_len(&self) -> usize {
@@ -122,7 +122,7 @@ impl Indicator for Atr {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 14)?;
     let method = match param_str(params, "method", "sma") {
         "ema" => AtrMethod::Ema,
@@ -141,7 +141,7 @@ mod tests {
         data.iter()
             .enumerate()
             .map(|(i, &(h, l, c))| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: c,
                 high: h,
                 low: l,

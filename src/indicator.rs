@@ -50,7 +50,7 @@ impl IndicatorOutput {
 
     /// Get the values for a named column.
     pub fn get(&self, name: &str) -> Option<&[f64]> {
-        self.columns.get(name).map(|v| v.as_slice())
+        self.columns.get(name).map(Vec::as_slice)
     }
 
     /// Get the *last* (most recent) value of a named column, skipping `NaN`.
@@ -67,7 +67,7 @@ impl IndicatorOutput {
 
     /// All column names present in this output.
     pub fn columns(&self) -> impl Iterator<Item = &str> {
-        self.columns.keys().map(|k| k.as_str())
+        self.columns.keys().map(String::as_str)
     }
 
     /// Number of rows (length of any column; all columns are guaranteed equal length).
@@ -118,7 +118,7 @@ impl IndicatorOutput {
 /// ```
 pub trait Indicator: Send + Sync + std::fmt::Debug {
     /// Short canonical name, e.g. `"SMA"`, `"RSI"`, `"MACD"`.
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
 
     /// Minimum number of candles required before output is non-`NaN`.
     /// Mirrors Python's implicit warm-up period used for validation.

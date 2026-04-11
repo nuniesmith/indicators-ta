@@ -62,7 +62,7 @@ impl KeltnerChannels {
 // ── Indicator impl ────────────────────────────────────────────────────────────
 
 impl Indicator for KeltnerChannels {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "KeltnerChannels"
     }
     fn required_len(&self) -> usize {
@@ -99,7 +99,7 @@ impl Indicator for KeltnerChannels {
         // Rolling mean of TR with min_periods=1 (matches Python's rolling(window, min_periods=1).mean())
         let mut atr = vec![0.0f64; n];
         for i in 0..n {
-            let start = if i + 1 >= p { i + 1 - p } else { 0 };
+            let start = (i + 1).saturating_sub(p);
             atr[i] = tr[start..=i].iter().sum::<f64>() / (i - start + 1) as f64;
         }
 
@@ -123,7 +123,7 @@ impl Indicator for KeltnerChannels {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(KeltnerChannels::new(KeltnerParams {
         period: param_usize(params, "period", 20)?,
         multiplier: param_f64(params, "multiplier", 2.0)?,
@@ -139,7 +139,7 @@ mod tests {
     fn candles(n: usize) -> Vec<Candle> {
         (0..n)
             .map(|i| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: 10.0 + i as f64 * 0.05,
                 high: 11.0 + i as f64 * 0.10,
                 low: 9.0 - i as f64 * 0.05,

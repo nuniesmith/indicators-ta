@@ -40,7 +40,7 @@ impl DetectorIndicator {
     }
 }
 
-fn regime_id(r: &MarketRegime) -> f64 {
+fn regime_id(r: MarketRegime) -> f64 {
     use super::types::TrendDirection;
     match r {
         MarketRegime::MeanReverting => 1.0,
@@ -52,7 +52,7 @@ fn regime_id(r: &MarketRegime) -> f64 {
 }
 
 impl Indicator for DetectorIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "RegimeDetector"
     }
     fn required_len(&self) -> usize {
@@ -76,18 +76,18 @@ impl Indicator for DetectorIndicator {
         for (i, c) in candles.iter().enumerate() {
             let rc = det.update(c.high, c.low, c.close);
             conf[i] = rc.confidence;
-            regime[i] = regime_id(&rc.regime);
+            regime[i] = regime_id(rc.regime);
         }
         Ok(IndicatorOutput::from_pairs([
             ("regime_conf", conf),
-            ("regime_id".into(), regime),
+            ("regime_id", regime),
         ]))
     }
 }
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let adx_period = param_usize(params, "adx_period", 14)?;
     let bb_period = param_usize(params, "bb_period", 20)?;
     let config = RegimeConfig {

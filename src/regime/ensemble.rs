@@ -46,7 +46,7 @@ impl EnsembleIndicator {
     }
 }
 
-fn regime_id_from(r: &MarketRegime) -> f64 {
+fn regime_id_from(r: MarketRegime) -> f64 {
     use super::types::TrendDirection;
     match r {
         MarketRegime::MeanReverting => 1.0,
@@ -58,7 +58,7 @@ fn regime_id_from(r: &MarketRegime) -> f64 {
 }
 
 impl Indicator for EnsembleIndicator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "EnsembleRegime"
     }
     fn required_len(&self) -> usize {
@@ -89,19 +89,19 @@ impl Indicator for EnsembleIndicator {
             let res = det.update(c.high, c.low, c.close);
             conf[i] = res.confidence;
             agree[i] = if res.methods_agree { 1.0 } else { 0.0 };
-            regime[i] = regime_id_from(&res.regime);
+            regime[i] = regime_id_from(res.regime);
         }
         Ok(IndicatorOutput::from_pairs([
             ("ensemble_conf", conf),
-            ("ensemble_agree".into(), agree),
-            ("ensemble_regime".into(), regime),
+            ("ensemble_agree", agree),
+            ("ensemble_regime", regime),
         ]))
     }
 }
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let adx_period = param_usize(params, "adx_period", 14)?;
     let bb_period = param_usize(params, "bb_period", 20)?;
     let indicator_cfg = RegimeConfig {

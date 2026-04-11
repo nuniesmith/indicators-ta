@@ -48,7 +48,7 @@ impl WilliamsR {
 }
 
 impl Indicator for WilliamsR {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "WilliamsR"
     }
     fn required_len(&self) -> usize {
@@ -86,7 +86,7 @@ impl Indicator for WilliamsR {
     }
 }
 
-pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(WilliamsR::new(WrParams {
         period: param_usize(params, "period", 14)?,
     })))
@@ -100,7 +100,7 @@ mod tests {
         data.iter()
             .enumerate()
             .map(|(i, &(h, l, c))| Candle {
-                time: i as i64,
+                time: i64::try_from(i).expect("time index fits i64"),
                 open: c,
                 high: h,
                 low: l,
@@ -115,7 +115,7 @@ mod tests {
             .map(|i| {
                 let f = i as f64;
                 Candle {
-                    time: i as i64,
+                    time: i64::try_from(i).expect("time index fits i64"),
                     open: f,
                     high: f + 1.0,
                     low: f - 1.0,
@@ -131,7 +131,7 @@ mod tests {
         let out = WilliamsR::with_period(14).calculate(&rising(20)).unwrap();
         for &v in out.get("WR_14").unwrap() {
             if !v.is_nan() {
-                assert!(v >= -100.0 && v <= 0.0, "out of range: {v}");
+                assert!((-100.0..=0.0).contains(&v), "out of range: {v}");
             }
         }
     }
