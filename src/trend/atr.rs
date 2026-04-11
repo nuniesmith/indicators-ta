@@ -30,7 +30,10 @@ use crate::types::Candle;
 // ── Params ────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AtrMethod { Sma, Ema }
+pub enum AtrMethod {
+    Sma,
+    Ema,
+}
 
 #[derive(Debug, Clone)]
 pub struct AtrParams {
@@ -42,7 +45,10 @@ pub struct AtrParams {
 
 impl Default for AtrParams {
     fn default() -> Self {
-        Self { period: 14, method: AtrMethod::Sma }
+        Self {
+            period: 14,
+            method: AtrMethod::Sma,
+        }
     }
 }
 
@@ -54,17 +60,34 @@ pub struct Atr {
 }
 
 impl Atr {
-    pub fn new(params: AtrParams) -> Self { Self { params } }
-    pub fn with_period(period: usize) -> Self { Self::new(AtrParams { period, ..Default::default() }) }
+    pub fn new(params: AtrParams) -> Self {
+        Self { params }
+    }
+    pub fn with_period(period: usize) -> Self {
+        Self::new(AtrParams {
+            period,
+            ..Default::default()
+        })
+    }
 
-    fn output_key(&self) -> String { format!("ATR_{}", self.params.period) }
-    fn norm_key(&self) -> String { format!("ATR_{}_normalized", self.params.period) }
+    fn output_key(&self) -> String {
+        format!("ATR_{}", self.params.period)
+    }
+    fn norm_key(&self) -> String {
+        format!("ATR_{}_normalized", self.params.period)
+    }
 }
 
 impl Indicator for Atr {
-    fn name(&self) -> &str { "ATR" }
-    fn required_len(&self) -> usize { self.params.period + 1 } // need prev close
-    fn required_columns(&self) -> &[&'static str] { &["high", "low", "close"] }
+    fn name(&self) -> &str {
+        "ATR"
+    }
+    fn required_len(&self) -> usize {
+        self.params.period + 1
+    } // need prev close
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close"]
+    }
 
     /// TODO: port Python SMA/EMA-smoothed ATR + normalized output.
     ///
@@ -73,8 +96,8 @@ impl Indicator for Atr {
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
-        let high:  Vec<f64> = candles.iter().map(|c| c.high).collect();
-        let low:   Vec<f64> = candles.iter().map(|c| c.low).collect();
+        let high: Vec<f64> = candles.iter().map(|c| c.high).collect();
+        let low: Vec<f64> = candles.iter().map(|c| c.low).collect();
         let close: Vec<f64> = candles.iter().map(|c| c.close).collect();
 
         let tr = functions::true_range(&high, &low, &close)?;

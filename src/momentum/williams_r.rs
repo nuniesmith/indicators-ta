@@ -21,22 +21,42 @@ use crate::registry::param_usize;
 use crate::types::Candle;
 
 #[derive(Debug, Clone)]
-pub struct WrParams { pub period: usize }
-impl Default for WrParams { fn default() -> Self { Self { period: 14 } } }
+pub struct WrParams {
+    pub period: usize,
+}
+impl Default for WrParams {
+    fn default() -> Self {
+        Self { period: 14 }
+    }
+}
 
 #[derive(Debug, Clone)]
-pub struct WilliamsR { pub params: WrParams }
+pub struct WilliamsR {
+    pub params: WrParams,
+}
 
 impl WilliamsR {
-    pub fn new(params: WrParams) -> Self { Self { params } }
-    pub fn with_period(period: usize) -> Self { Self::new(WrParams { period }) }
-    fn output_key(&self) -> String { format!("WR_{}", self.params.period) }
+    pub fn new(params: WrParams) -> Self {
+        Self { params }
+    }
+    pub fn with_period(period: usize) -> Self {
+        Self::new(WrParams { period })
+    }
+    fn output_key(&self) -> String {
+        format!("WR_{}", self.params.period)
+    }
 }
 
 impl Indicator for WilliamsR {
-    fn name(&self) -> &str { "WilliamsR" }
-    fn required_len(&self) -> usize { self.params.period }
-    fn required_columns(&self) -> &[&'static str] { &["high", "low", "close"] }
+    fn name(&self) -> &str {
+        "WilliamsR"
+    }
+    fn required_len(&self) -> usize {
+        self.params.period
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close"]
+    }
 
     /// TODO: port Python rolling max/min %R formula.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
@@ -50,10 +70,13 @@ impl Indicator for WilliamsR {
         for i in (p - 1)..n {
             let window = &candles[(i + 1 - p)..=i];
             let highest_h = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
-            let lowest_l  = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
+            let lowest_l = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
             let range = highest_h - lowest_l;
-            values[i] = if range == 0.0 { f64::NAN }
-                        else { -100.0 * (highest_h - candles[i].close) / range };
+            values[i] = if range == 0.0 {
+                f64::NAN
+            } else {
+                -100.0 * (highest_h - candles[i].close) / range
+            };
         }
 
         Ok(IndicatorOutput::from_pairs([(self.output_key(), values)]))
@@ -61,7 +84,9 @@ impl Indicator for WilliamsR {
 }
 
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
-    Ok(Box::new(WilliamsR::new(WrParams { period: param_usize(params, "period", 14)? })))
+    Ok(Box::new(WilliamsR::new(WrParams {
+        period: param_usize(params, "period", 14)?,
+    })))
 }
 
 #[cfg(test)]
@@ -85,7 +110,9 @@ mod tests {
     fn wr_range_neg100_to_0() {
         let out = WilliamsR::with_period(14).calculate(&rising(20)).unwrap();
         for &v in out.get("WR_14").unwrap() {
-            if !v.is_nan() { assert!(v >= -100.0 && v <= 0.0, "out of range: {v}"); }
+            if !v.is_nan() {
+                assert!(v >= -100.0 && v <= 0.0, "out of range: {v}");
+            }
         }
     }
 

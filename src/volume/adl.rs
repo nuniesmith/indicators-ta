@@ -30,13 +30,21 @@ use crate::types::Candle;
 pub struct Adl;
 
 impl Adl {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Indicator for Adl {
-    fn name(&self) -> &str { "ADL" }
-    fn required_len(&self) -> usize { 1 }
-    fn required_columns(&self) -> &[&'static str] { &["high", "low", "close", "volume"] }
+    fn name(&self) -> &str {
+        "ADL"
+    }
+    fn required_len(&self) -> usize {
+        1
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close", "volume"]
+    }
 
     /// TODO: port Python ADL cumsum logic.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {

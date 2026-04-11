@@ -47,9 +47,17 @@ pub struct Vwap {
 }
 
 impl Vwap {
-    pub fn new(params: VwapParams) -> Self { Self { params } }
-    pub fn cumulative() -> Self { Self::new(VwapParams { period: None }) }
-    pub fn rolling(period: usize) -> Self { Self::new(VwapParams { period: Some(period) }) }
+    pub fn new(params: VwapParams) -> Self {
+        Self { params }
+    }
+    pub fn cumulative() -> Self {
+        Self::new(VwapParams { period: None })
+    }
+    pub fn rolling(period: usize) -> Self {
+        Self::new(VwapParams {
+            period: Some(period),
+        })
+    }
 
     fn output_key(&self) -> String {
         match self.params.period {
@@ -60,7 +68,9 @@ impl Vwap {
 }
 
 impl Indicator for Vwap {
-    fn name(&self) -> &str { "VWAP" }
+    fn name(&self) -> &str {
+        "VWAP"
+    }
 
     fn required_len(&self) -> usize {
         self.params.period.unwrap_or(1)
@@ -87,7 +97,11 @@ impl Indicator for Vwap {
                 vp.iter().zip(&vol).map(|(&v, &vol)| {
                     cum_vp += v;
                     cum_vol += vol;
-                    if cum_vol == 0.0 { f64::NAN } else { cum_vp / cum_vol }
+                    if cum_vol == 0.0 {
+                            f64::NAN
+                        } else {
+                            cum_vp / cum_vol
+                        }
                 }).collect()
             }
             Some(period) => {
@@ -96,7 +110,11 @@ impl Indicator for Vwap {
                 for i in (period - 1)..n {
                     let sum_vp: f64 = vp[(i + 1 - period)..=i].iter().sum();
                     let sum_vol: f64 = vol[(i + 1 - period)..=i].iter().sum();
-                    values[i] = if sum_vol == 0.0 { f64::NAN } else { sum_vp / sum_vol };
+                    values[i] = if sum_vol == 0.0 {
+                        f64::NAN
+                    } else {
+                        sum_vp / sum_vol
+                    };
                 }
                 values
             }

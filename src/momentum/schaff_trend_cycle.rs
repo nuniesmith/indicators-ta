@@ -33,31 +33,48 @@ use crate::types::Candle;
 
 #[derive(Debug, Clone)]
 pub struct StcParams {
-    pub short_ema:     usize,
-    pub long_ema:      usize,
-    pub stoch_period:  usize,
+    pub short_ema: usize,
+    pub long_ema: usize,
+    pub stoch_period: usize,
     pub signal_period: usize,
 }
 impl Default for StcParams {
-    fn default() -> Self { Self { short_ema: 12, long_ema: 26, stoch_period: 10, signal_period: 3 } }
+    fn default() -> Self {
+        Self {
+            short_ema: 12,
+            long_ema: 26,
+            stoch_period: 10,
+            signal_period: 3,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
-pub struct SchaffTrendCycle { pub params: StcParams }
+pub struct SchaffTrendCycle {
+    pub params: StcParams,
+}
 
 impl SchaffTrendCycle {
-    pub fn new(params: StcParams) -> Self { Self { params } }
-    pub fn default() -> Self { Self::new(StcParams::default()) }
+    pub fn new(params: StcParams) -> Self {
+        Self { params }
+    }
+    pub fn default() -> Self {
+        Self::new(StcParams::default())
+    }
 }
 
 impl Indicator for SchaffTrendCycle {
-    fn name(&self) -> &str { "SchaffTrendCycle" }
+    fn name(&self) -> &str {
+        "SchaffTrendCycle"
+    }
 
     fn required_len(&self) -> usize {
         self.params.long_ema + self.params.stoch_period + self.params.signal_period
     }
 
-    fn required_columns(&self) -> &[&'static str] { &["close"] }
+    fn required_columns(&self) -> &[&'static str] {
+        &["close"]
+    }
 
     /// TODO: port Python MACD-then-Stochastic-then-EMA pipeline.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
@@ -68,7 +85,7 @@ impl Indicator for SchaffTrendCycle {
 
         // Step 1: MACD components.
         let short_e = functions::ema(&close, self.params.short_ema)?;
-        let long_e  = functions::ema(&close, self.params.long_ema)?;
+        let long_e = functions::ema(&close, self.params.long_ema)?;
         let macd_line: Vec<f64> = (0..n).map(|i| {
             if short_e[i].is_nan() || long_e[i].is_nan() { f64::NAN }
             else { short_e[i] - long_e[i] }
@@ -109,9 +126,9 @@ impl Indicator for SchaffTrendCycle {
 
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(SchaffTrendCycle::new(StcParams {
-        short_ema:     param_usize(params, "short_ema", 12)?,
-        long_ema:      param_usize(params, "long_ema", 26)?,
-        stoch_period:  param_usize(params, "stoch_period", 10)?,
+        short_ema: param_usize(params, "short_ema", 12)?,
+        long_ema: param_usize(params, "long_ema", 26)?,
+        stoch_period: param_usize(params, "stoch_period", 10)?,
         signal_period: param_usize(params, "signal_period", 3)?,
     })))
 }

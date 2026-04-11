@@ -35,7 +35,10 @@ pub struct WmaParams {
 
 impl Default for WmaParams {
     fn default() -> Self {
-        Self { period: 14, column: PriceColumn::Close }
+        Self {
+            period: 14,
+            column: PriceColumn::Close,
+        }
     }
 }
 
@@ -52,7 +55,10 @@ impl Wma {
     }
 
     pub fn with_period(period: usize) -> Self {
-        Self::new(WmaParams { period, ..Default::default() })
+        Self::new(WmaParams {
+            period,
+            ..Default::default()
+        })
     }
 
     fn output_key(&self) -> String {
@@ -61,9 +67,15 @@ impl Wma {
 }
 
 impl Indicator for Wma {
-    fn name(&self) -> &str { "WMA" }
-    fn required_len(&self) -> usize { self.params.period }
-    fn required_columns(&self) -> &[&'static str] { &["close"] }
+    fn name(&self) -> &str {
+        "WMA"
+    }
+    fn required_len(&self) -> usize {
+        self.params.period
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["close"]
+    }
 
     /// TODO: port Python linear-weight rolling calculation.
     ///

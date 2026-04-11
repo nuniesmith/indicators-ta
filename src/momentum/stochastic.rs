@@ -38,7 +38,11 @@ pub struct StochParams {
 
 impl Default for StochParams {
     fn default() -> Self {
-        Self { k_period: 14, smooth_k: 3, d_period: 3 }
+        Self {
+            k_period: 14,
+            smooth_k: 3,
+            d_period: 3,
+        }
     }
 }
 
@@ -50,18 +54,26 @@ pub struct Stochastic {
 }
 
 impl Stochastic {
-    pub fn new(params: StochParams) -> Self { Self { params } }
-    pub fn default() -> Self { Self::new(StochParams::default()) }
+    pub fn new(params: StochParams) -> Self {
+        Self { params }
+    }
+    pub fn default() -> Self {
+        Self::new(StochParams::default())
+    }
 }
 
 impl Indicator for Stochastic {
-    fn name(&self) -> &str { "Stochastic" }
+    fn name(&self) -> &str {
+        "Stochastic"
+    }
 
     fn required_len(&self) -> usize {
         self.params.k_period + self.params.smooth_k + self.params.d_period - 2
     }
 
-    fn required_columns(&self) -> &[&'static str] { &["high", "low", "close"] }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close"]
+    }
 
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
@@ -78,8 +90,11 @@ impl Indicator for Stochastic {
             let hh = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
             let ll = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
             let range = hh - ll;
-            raw_k[i] = if range == 0.0 { f64::NAN }
-                       else { 100.0 * (candles[i].close - ll) / range };
+            raw_k[i] = if range == 0.0 {
+                f64::NAN
+            } else {
+                100.0 * (candles[i].close - ll) / range
+            };
         }
 
         // ── Step 2: smooth %K (SMA) ───────────────────────────────────────────
@@ -176,8 +191,14 @@ mod tests {
         let d = out.get("Stoch_D").unwrap();
         let last_k = k.iter().rev().find(|v| !v.is_nan()).copied().unwrap();
         let last_d = d.iter().rev().find(|v| !v.is_nan()).copied().unwrap();
-        assert!((last_k - 50.0).abs() < 1e-9, "K expected 50.0, got {last_k}");
-        assert!((last_d - 50.0).abs() < 1e-9, "D expected 50.0, got {last_d}");
+        assert!(
+            (last_k - 50.0).abs() < 1e-9,
+            "K expected 50.0, got {last_k}"
+        );
+        assert!(
+            (last_d - 50.0).abs() < 1e-9,
+            "D expected 50.0, got {last_d}"
+        );
     }
 
     #[test]
@@ -208,14 +229,24 @@ mod tests {
     fn stoch_range_0_to_100() {
         // Rising then falling sequence.
         let mut data = vec![];
-        for i in 0..15 { let f = i as f64; data.push((f + 1.0, f - 1.0, f)); }
-        for i in (0..10).rev() { let f = i as f64; data.push((f + 1.0, f - 1.0, f)); }
+        for i in 0..15 {
+            let f = i as f64;
+            data.push((f + 1.0, f - 1.0, f));
+        }
+        for i in (0..10).rev() {
+            let f = i as f64;
+            data.push((f + 1.0, f - 1.0, f));
+        }
         let out = Stochastic::default().calculate(&make_candles(&data)).unwrap();
         for &v in out.get("Stoch_K").unwrap() {
-            if !v.is_nan() { assert!(v >= 0.0 && v <= 100.0, "K out of range: {v}"); }
+            if !v.is_nan() {
+                assert!(v >= 0.0 && v <= 100.0, "K out of range: {v}");
+            }
         }
         for &v in out.get("Stoch_D").unwrap() {
-            if !v.is_nan() { assert!(v >= 0.0 && v <= 100.0, "D out of range: {v}"); }
+            if !v.is_nan() {
+                assert!(v >= 0.0 && v <= 100.0, "D out of range: {v}");
+            }
         }
     }
 

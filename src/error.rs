@@ -6,11 +6,19 @@ use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum IndicatorError {
-    InsufficientData { required: usize, available: usize },
-    InvalidParameter { name: String, value: f64 },
+    InsufficientData {
+        required: usize,
+        available: usize,
+    },
+    InvalidParameter {
+        name: String,
+        value: f64,
+    },
     /// Returned by the registry when `name` is not registered.
     /// Mirrors Python `IndicatorFactory`: `raise ValueError(f"Indicator not found: {name}")`.
-    UnknownIndicator { name: String },
+    UnknownIndicator {
+        name: String,
+    },
     /// General construction-time validation failure (bad param combination, etc.).
     InvalidParam(String),
 }

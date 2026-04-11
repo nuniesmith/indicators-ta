@@ -96,38 +96,38 @@ impl Indicator for BollingerBands {
         self.check_len(candles)?;
 
         let prices = self.params.column.extract(candles);
-        let n = prices.len();
-        let p = self.params.period;
-        let k = self.params.std_dev;
+        let num_bars = prices.len();
+        let period = self.params.period;
+        let std_mult = self.params.std_dev;
 
         // Rolling SMA
-        let mut middle = vec![f64::NAN; n];
-        for i in (p - 1)..n {
-            middle[i] = prices[(i + 1 - p)..=i].iter().sum::<f64>() / p as f64;
+        let mut middle = vec![f64::NAN; num_bars];
+        for i in (period - 1)..num_bars {
+            middle[i] = prices[(i + 1 - period)..=i].iter().sum::<f64>() / period as f64;
         }
 
-        let std = rolling_std(&prices, p);
+        let std = rolling_std(&prices, period);
 
-        let mut upper = vec![f64::NAN; n];
-        let mut lower = vec![f64::NAN; n];
-        let mut bandwidth = vec![f64::NAN; n];
-        let mut pct_b = vec![f64::NAN; n];
+        let mut upper = vec![f64::NAN; num_bars];
+        let mut lower = vec![f64::NAN; num_bars];
+        let mut bandwidth = vec![f64::NAN; num_bars];
+        let mut pct_b = vec![f64::NAN; num_bars];
 
-        for i in (p - 1)..n {
-            let u = middle[i] + k * std[i];
-            let l = middle[i] - k * std[i];
-            upper[i] = u;
-            lower[i] = l;
+        for i in (period - 1)..num_bars {
+            let upper_val = middle[i] + std_mult * std[i];
+            let lower_val = middle[i] - std_mult * std[i];
+            upper[i] = upper_val;
+            lower[i] = lower_val;
             bandwidth[i] = if middle[i] == 0.0 {
                 f64::NAN
             } else {
-                (u - l) / middle[i]
+                (upper_val - lower_val) / middle[i]
             };
-            let band_range = u - l;
+            let band_range = upper_val - lower_val;
             pct_b[i] = if band_range == 0.0 {
                 f64::NAN
             } else {
-                (prices[i] - l) / band_range
+                (prices[i] - lower_val) / band_range
             };
         }
 

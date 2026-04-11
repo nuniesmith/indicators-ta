@@ -88,7 +88,7 @@ impl Indicator for RouterIndicator {
             }
         }
         Ok(IndicatorOutput::from_pairs([
-            ("router_conf".into(), conf_out),
+            ("router_conf", conf_out),
             ("router_factor".into(), factor_out),
             ("router_regime".into(), regime_out),
         ]))

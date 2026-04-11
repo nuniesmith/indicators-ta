@@ -8,26 +8,99 @@
 //!
 //! Uses stable Rust only (no nightly features).
 
-use super::types::{MarketRegime, RegimeConfidence, TrendDirection};
+use std::collections::{HashMap, VecDeque};
+
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+
+use super::types::{MarketRegime, RegimeConfidence, TrendDirection};
+
+use crate::error::IndicatorError;
+use crate::indicator::{Indicator, IndicatorOutput};
+use crate::registry::param_usize;
+use crate::types::Candle;
+
+// ── Indicator wrapper ─────────────────────────────────────────────────────────
+
+/// Batch `Indicator` adapter for [`HMMRegimeDetector`].
+///
+/// Replays candles through the streaming HMM detector and emits per-bar
+/// `hmm_conf` (0–1) and `hmm_regime_id`:
+/// - 0 = Uncertain
+/// - 1 = MeanReverting
+/// - 2 = Volatile
+/// - 3 = Trending(Bullish)
+/// - 4 = Trending(Bearish)
+#[derive(Debug, Clone)]
+pub struct HmmIndicator {
+    pub config: HMMConfig,
+}
+
+impl HmmIndicator {
+    pub fn new(config: HMMConfig) -> Self {
+        Self { config }
+    }
+
+    pub fn with_defaults() -> Self {
+        Self::new(HMMConfig::default())
+    }
+}
+
+fn hmm_regime_id(r: &MarketRegime) -> f64 {
+    match r {
+        MarketRegime::MeanReverting => 1.0,
+        MarketRegime::Volatile => 2.0,
+        MarketRegime::Trending(TrendDirection::Bullish) => 3.0,
+        MarketRegime::Trending(TrendDirection::Bearish) => 4.0,
+        MarketRegime::Uncertain => 0.0,
+    }
+}
+
+impl Indicator for HmmIndicator {
+    fn name(&self) -> &str {
+        "HMMRegime"
+    }
+
+    /// Minimum candles before meaningful output.
+    ///
+    /// The HMM requires `min_observations` returns, which means
+    /// `min_observations + 1` close prices (one extra to form the first return).
+    fn required_len(&self) -> usize {
+        self.config.min_observations + 1
+    }
+
+    fn required_columns(&self) -> &[&'static str] {
+        &["close"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let mut det = HMMRegimeDetector::new(self.config.clone());
+        let n = candles.len();
+        let mut conf = vec![f64::NAN; n];
+        let mut regime = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            let rc = det.update(c.close);
+            conf[i] = rc.confidence;
+            regime[i] = hmm_regime_id(&rc.regime);
+        }
+        Ok(IndicatorOutput::from_pairs([
+            ("hmm_conf", conf),
+            ("hmm_regime_id".into(), regime),
+        ]))
+    }
+}
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
-    let period = param_usize(params, "period", 20)?;
-    let std_dev = param_f64(params, "std_dev", 2.0)?;
-    let column = match param_str(params, "column", "close") {
-        "open" => PriceColumn::Open,
-        "high" => PriceColumn::High,
-        "low" => PriceColumn::Low,
-        _ => PriceColumn::Close,
+    let min_observations = param_usize(params, "min_observations", 100)?;
+    let n_states = param_usize(params, "n_states", 3)?;
+    let config = HMMConfig {
+        min_observations,
+        n_states,
+        ..HMMConfig::default()
     };
-    Ok(Box::new(BollingerBands::new(BollingerParams {
-        period,
-        std_dev,
-        column,
-    })))
+    Ok(Box::new(HmmIndicator::new(config)))
 }
 
 /// Configuration for HMM regime detector
@@ -192,7 +265,6 @@ pub struct HMMRegimeDetector {
     n_observations: usize,
 
     /// Last detected regime
-    #[allow(dead_code)]
     last_regime: MarketRegime,
 }
 
@@ -291,7 +363,9 @@ impl HMMRegimeDetector {
         }
 
         // Return current regime
-        self.get_regime_confidence()
+        let confidence = self.get_regime_confidence();
+        self.last_regime = confidence.regime;
+        confidence
     }
 
     /// Update with OHLC data (uses close price for HMM)

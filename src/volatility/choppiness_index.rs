@@ -24,22 +24,42 @@ use crate::registry::param_usize;
 use crate::types::Candle;
 
 #[derive(Debug, Clone)]
-pub struct ChopParams { pub period: usize }
-impl Default for ChopParams { fn default() -> Self { Self { period: 14 } } }
+pub struct ChopParams {
+    pub period: usize,
+}
+impl Default for ChopParams {
+    fn default() -> Self {
+        Self { period: 14 }
+    }
+}
 
 #[derive(Debug, Clone)]
-pub struct ChoppinessIndex { pub params: ChopParams }
+pub struct ChoppinessIndex {
+    pub params: ChopParams,
+}
 
 impl ChoppinessIndex {
-    pub fn new(params: ChopParams) -> Self { Self { params } }
-    pub fn with_period(period: usize) -> Self { Self::new(ChopParams { period }) }
-    fn output_key(&self) -> String { format!("CHOP_{}", self.params.period) }
+    pub fn new(params: ChopParams) -> Self {
+        Self { params }
+    }
+    pub fn with_period(period: usize) -> Self {
+        Self::new(ChopParams { period })
+    }
+    fn output_key(&self) -> String {
+        format!("CHOP_{}", self.params.period)
+    }
 }
 
 impl Indicator for ChoppinessIndex {
-    fn name(&self) -> &str { "ChoppinessIndex" }
-    fn required_len(&self) -> usize { self.params.period }
-    fn required_columns(&self) -> &[&'static str] { &["high", "low"] }
+    fn name(&self) -> &str {
+        "ChoppinessIndex"
+    }
+    fn required_len(&self) -> usize {
+        self.params.period
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low"]
+    }
 
     /// TODO: port Python log10-based choppiness formula.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
@@ -58,8 +78,11 @@ impl Indicator for ChoppinessIndex {
             let max_h = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
             let min_l = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
             let denom = max_h - min_l;
-            values[i] = if denom == 0.0 || log_period == 0.0 { f64::NAN }
-                        else { 100.0 * (atr_sum / denom).log10() / log_period };
+            values[i] = if denom == 0.0 || log_period == 0.0 {
+                f64::NAN
+            } else {
+                100.0 * (atr_sum / denom).log10() / log_period
+            };
         }
 
         Ok(IndicatorOutput::from_pairs([(self.output_key(), values)]))
@@ -67,7 +90,9 @@ impl Indicator for ChoppinessIndex {
 }
 
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
-    Ok(Box::new(ChoppinessIndex::new(ChopParams { period: param_usize(params, "period", 14)? })))
+    Ok(Box::new(ChoppinessIndex::new(ChopParams {
+        period: param_usize(params, "period", 14)?,
+    })))
 }
 
 #[cfg(test)]

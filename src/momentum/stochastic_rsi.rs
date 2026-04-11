@@ -36,7 +36,12 @@ pub struct StochRsiParams {
 
 impl Default for StochRsiParams {
     fn default() -> Self {
-        Self { rsi_period: 14, stoch_period: 14, k_smooth: 3, d_period: 3 }
+        Self {
+            rsi_period: 14,
+            stoch_period: 14,
+            k_smooth: 3,
+            d_period: 3,
+        }
     }
 }
 
@@ -48,12 +53,18 @@ pub struct StochasticRsi {
 }
 
 impl StochasticRsi {
-    pub fn new(params: StochRsiParams) -> Self { Self { params } }
-    pub fn default() -> Self { Self::new(StochRsiParams::default()) }
+    pub fn new(params: StochRsiParams) -> Self {
+        Self { params }
+    }
+    pub fn default() -> Self {
+        Self::new(StochRsiParams::default())
+    }
 }
 
 impl Indicator for StochasticRsi {
-    fn name(&self) -> &str { "StochasticRSI" }
+    fn name(&self) -> &str {
+        "StochasticRSI"
+    }
 
     fn required_len(&self) -> usize {
         // RSI needs rsi_period+1 bars; stochastic then needs stoch_period RSI values;
@@ -65,7 +76,9 @@ impl Indicator for StochasticRsi {
             - 2
     }
 
-    fn required_columns(&self) -> &[&'static str] { &["close"] }
+    fn required_columns(&self) -> &[&'static str] {
+        &["close"]
+    }
 
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
@@ -88,16 +101,27 @@ impl Indicator for StochasticRsi {
         for i in (stoch_p - 1)..n {
             // Window must be fully non-NaN.
             let window = &rsi[(i + 1 - stoch_p)..=i];
-            if window.iter().any(|v| v.is_nan()) { continue; }
+            if window.iter().any(|v| v.is_nan()) {
+                continue;
+            }
             let min_r = window.iter().cloned().fold(f64::INFINITY, f64::min);
             let max_r = window.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
             let range = max_r - min_r;
-            raw_k[i] = if range == 0.0 { 50.0 }  // flat RSI → neutral %K
-                       else { 100.0 * (rsi[i] - min_r) / range };
+            raw_k[i] = if range == 0.0 {
+                50.0
+            }
+            // flat RSI → neutral %K
+            else {
+                100.0 * (rsi[i] - min_r) / range
+            };
         }
 
         // ── Step 3: smooth %K ─────────────────────────────────────────────────
-        let smooth_k = if ks <= 1 { raw_k.clone() } else { sma_of(&raw_k, ks) };
+        let smooth_k = if ks <= 1 {
+            raw_k.clone()
+        } else {
+            sma_of(&raw_k, ks)
+        };
 
         // ── Step 4: %D ────────────────────────────────────────────────────────
         let d = sma_of(&smooth_k, dp);
@@ -114,7 +138,9 @@ fn sma_of(src: &[f64], period: usize) -> Vec<f64> {
     let mut out = vec![f64::NAN; n];
     let mut consecutive = 0usize;
     for i in 0..n {
-        if src[i].is_nan() { consecutive = 0; } else {
+        if src[i].is_nan() {
+            consecutive = 0;
+        } else {
             consecutive += 1;
             if consecutive >= period {
                 let sum: f64 = src[(i + 1 - period)..=i].iter().sum();
@@ -129,10 +155,10 @@ fn sma_of(src: &[f64], period: usize) -> Vec<f64> {
 
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(StochasticRsi::new(StochRsiParams {
-        rsi_period:   param_usize(params, "rsi_period", 14)?,
+        rsi_period: param_usize(params, "rsi_period", 14)?,
         stoch_period: param_usize(params, "stoch_period", 14)?,
-        k_smooth:     param_usize(params, "k_smooth", 3)?,
-        d_period:     param_usize(params, "d_period", 3)?,
+        k_smooth: param_usize(params, "k_smooth", 3)?,
+        d_period: param_usize(params, "d_period", 3)?,
     })))
 }
 
@@ -173,10 +199,14 @@ mod tests {
             .collect();
         let out = StochasticRsi::default().calculate(&make_candles(&prices)).unwrap();
         for &v in out.get("StochRSI_K").unwrap() {
-            if !v.is_nan() { assert!(v >= 0.0 && v <= 100.0, "K out of range: {v}"); }
+            if !v.is_nan() {
+                assert!(v >= 0.0 && v <= 100.0, "K out of range: {v}");
+            }
         }
         for &v in out.get("StochRSI_D").unwrap() {
-            if !v.is_nan() { assert!(v >= 0.0 && v <= 100.0, "D out of range: {v}"); }
+            if !v.is_nan() {
+                assert!(v >= 0.0 && v <= 100.0, "D out of range: {v}");
+            }
         }
     }
 

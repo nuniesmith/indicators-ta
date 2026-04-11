@@ -11,33 +11,107 @@
 //! - **L10** Hurst exponent (R/S analysis, recomputed every 10 bars)
 //! - **L11** Price acceleration (2nd derivative, normalised)
 
-use crate::types::Candle;
-use crate::signal::vol_regime::PercentileTracker;
+use std::collections::{HashMap, VecDeque};
+
 use chrono::{NaiveDate, TimeZone, Utc};
-use std::collections::VecDeque;
+
+use crate::error::IndicatorError;
+use crate::indicator::{Indicator, IndicatorOutput};
+use crate::registry::param_usize;
+use crate::signal::vol_regime::PercentileTracker;
+use crate::types::Candle;
+
+// ── Indicator wrapper ─────────────────────────────────────────────────────────
+
+/// Batch `Indicator` adapter for [`Indicators`].
+///
+/// Replays candles through the full engine (L1–L4, L9–L11) and emits per-bar
+/// columns for every published field.
+#[derive(Debug, Clone)]
+pub struct EngineIndicator {
+    pub config: IndicatorConfig,
+}
+
+impl EngineIndicator {
+    pub fn new(config: IndicatorConfig) -> Self {
+        Self { config }
+    }
+    pub fn with_defaults() -> Self {
+        Self::new(IndicatorConfig::default())
+    }
+}
+
+impl Indicator for EngineIndicator {
+    fn name(&self) -> &str {
+        "Engine"
+    }
+    fn required_len(&self) -> usize {
+        self.config.training_period
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["open", "high", "low", "close", "volume"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let mut ind = Indicators::new(self.config.clone());
+        let n = candles.len();
+        let mut vwap_out = vec![f64::NAN; n];
+        let mut ema_out = vec![f64::NAN; n];
+        let mut st_out = vec![f64::NAN; n];
+        let mut st_dir_out = vec![f64::NAN; n];
+        let mut ts_norm_out = vec![f64::NAN; n];
+        let mut ts_bullish_out = vec![f64::NAN; n];
+        let mut hurst_out = vec![f64::NAN; n];
+        let mut accel_out = vec![f64::NAN; n];
+        let mut ao_out = vec![f64::NAN; n];
+        let mut dominance_out = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            ind.update(c);
+            vwap_out[i] = ind.vwap.unwrap_or(f64::NAN);
+            ema_out[i] = ind.ema.unwrap_or(f64::NAN);
+            st_out[i] = ind.st.unwrap_or(f64::NAN);
+            st_dir_out[i] = ind.st_dir_pub as f64;
+            ts_norm_out[i] = ind.ts_norm;
+            ts_bullish_out[i] = if ind.ts_bullish { 1.0 } else { 0.0 };
+            hurst_out[i] = ind.hurst;
+            accel_out[i] = ind.price_accel;
+            ao_out[i] = ind.ao;
+            dominance_out[i] = ind.dominance;
+        }
+        Ok(IndicatorOutput::from_pairs([
+            ("engine_vwap", vwap_out),
+            ("engine_ema".into(), ema_out),
+            ("engine_st".into(), st_out),
+            ("engine_st_dir".into(), st_dir_out),
+            ("engine_ts_norm".into(), ts_norm_out),
+            ("engine_ts_bullish".into(), ts_bullish_out),
+            ("engine_hurst".into(), hurst_out),
+            ("engine_accel".into(), accel_out),
+            ("engine_ao".into(), ao_out),
+            ("engine_dominance".into(), dominance_out),
+        ]))
+    }
+}
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
-    let period = param_usize(params, "period", 20)?;
-    let std_dev = param_f64(params, "std_dev", 2.0)?;
-    let column = match param_str(params, "column", "close") {
-        "open" => PriceColumn::Open,
-        "high" => PriceColumn::High,
-        "low" => PriceColumn::Low,
-        _ => PriceColumn::Close,
+    let training_period = param_usize(params, "training_period", 100)?;
+    let ema_len = param_usize(params, "ema_len", 9)?;
+    let atr_len = param_usize(params, "atr_len", 10)?;
+    let config = IndicatorConfig {
+        training_period,
+        ema_len,
+        atr_len,
+        ..IndicatorConfig::default()
     };
-    Ok(Box::new(BollingerBands::new(BollingerParams {
-        period,
-        std_dev,
-        column,
-    })))
+    Ok(Box::new(EngineIndicator::new(config)))
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
 /// All parameters the indicator engine needs — pure math, no runtime concerns.
-/// ```
 #[derive(Debug, Clone)]
 pub struct IndicatorConfig {
     /// Candle buffer capacity (typically `history_candles`).
@@ -101,13 +175,6 @@ impl Default for IndicatorConfig {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-#[inline]
-#[allow(dead_code)]
-fn ema_step(prev: Option<f64>, val: f64, len: usize) -> f64 {
-    let k = 2.0 / (len as f64 + 1.0);
-    prev.map_or(val, |p| val * k + p * (1.0 - k))
-}
 
 #[inline]
 fn rma_step(prev: Option<f64>, val: f64, len: usize) -> f64 {

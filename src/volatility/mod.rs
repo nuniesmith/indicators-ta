@@ -16,9 +16,9 @@ use crate::registry::IndicatorRegistry;
 
 /// Register all volatility indicators with the given registry.
 pub fn register_all(reg: &IndicatorRegistry) {
-    reg.register("bollingerbands",  bollinger::factory);
+    reg.register("bollingerbands", bollinger::factory);
     reg.register("choppinessindex", choppiness_index::factory);
-    reg.register("elderrayindex",   elder_ray_index::factory);
+    reg.register("elderrayindex", elder_ray_index::factory);
     reg.register("keltnerchannels", keltner_channels::factory);
-    reg.register("marketcycle",     market_cycle::factory);
+    reg.register("marketcycle", market_cycle::factory);
 }

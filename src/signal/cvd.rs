@@ -69,7 +69,7 @@ impl Indicator for CvdIndicator {
             div_out[i] = tracker.divergence as f64;
         }
         Ok(IndicatorOutput::from_pairs([
-            ("cvd".into(), cvd_out),
+            ("cvd", cvd_out),
             ("cvd_slope".into(), slope),
             ("cvd_div".into(), div_out),
         ]))
@@ -87,6 +87,7 @@ pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, I
     })))
 }
 
+#[derive(Debug)]
 pub struct CVDTracker {
     slope_bars: usize,
     div_lookback: usize,
@@ -123,7 +124,7 @@ impl CVDTracker {
     }
 
     pub fn update(&mut self, candle: &Candle) {
-        let dt: DateTime<Utc> = Utc
+        let dt = Utc
             .timestamp_millis_opt(candle.time)
             .single()
             .unwrap_or_else(Utc::now);

@@ -26,15 +26,33 @@ pub struct LrParams {
     /// Price field.  Python default: close.
     pub column: PriceColumn,
 }
-impl Default for LrParams { fn default() -> Self { Self { period: 14, column: PriceColumn::Close } } }
+impl Default for LrParams {
+    fn default() -> Self {
+        Self {
+            period: 14,
+            column: PriceColumn::Close,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
-pub struct LinearRegression { pub params: LrParams }
+pub struct LinearRegression {
+    pub params: LrParams,
+}
 
 impl LinearRegression {
-    pub fn new(params: LrParams) -> Self { Self { params } }
-    pub fn with_period(period: usize) -> Self { Self::new(LrParams { period, ..Default::default() }) }
-    fn output_key(&self) -> String { format!("LR_slope_{}", self.params.period) }
+    pub fn new(params: LrParams) -> Self {
+        Self { params }
+    }
+    pub fn with_period(period: usize) -> Self {
+        Self::new(LrParams {
+            period,
+            ..Default::default()
+        })
+    }
+    fn output_key(&self) -> String {
+        format!("LR_slope_{}", self.params.period)
+    }
 
     /// OLS slope: `sum((x - x_mean)(y - y_mean)) / sum((x - x_mean)^2)`
     /// where `x = 0..period`.
@@ -54,9 +72,15 @@ impl LinearRegression {
 }
 
 impl Indicator for LinearRegression {
-    fn name(&self) -> &str { "LinearRegression" }
-    fn required_len(&self) -> usize { self.params.period }
-    fn required_columns(&self) -> &[&'static str] { &["close"] }
+    fn name(&self) -> &str {
+        "LinearRegression"
+    }
+    fn required_len(&self) -> usize {
+        self.params.period
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["close"]
+    }
 
     /// TODO: port Python rolling `np.polyfit` slope.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
@@ -77,7 +101,10 @@ impl Indicator for LinearRegression {
 }
 
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
-    Ok(Box::new(LinearRegression::new(LrParams { period: param_usize(params, "period", 14)?, ..Default::default() })))
+    Ok(Box::new(LinearRegression::new(LrParams {
+        period: param_usize(params, "period", 14)?,
+        ..Default::default()
+    })))
 }
 
 #[cfg(test)]

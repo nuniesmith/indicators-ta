@@ -3,27 +3,115 @@
 //! Detects swing highs/lows, identifies Break of Structure (BOS) and
 //! Change of Character (CHoCH), and computes Fibonacci retracement levels.
 
+use std::collections::{HashMap, VecDeque};
+
+use crate::error::IndicatorError;
+use crate::indicator::{Indicator, IndicatorOutput};
+use crate::registry::{param_f64, param_usize};
 use crate::types::Candle;
-use std::collections::VecDeque;
+
+// ── Params ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct StructureParams {
+    /// Half-width of the pivot detection window (bars on each side of pivot).
+    pub swing_len: usize,
+    /// Minimum ATR multiple required between swings to qualify.
+    pub atr_mult: f64,
+}
+
+impl Default for StructureParams {
+    fn default() -> Self {
+        Self {
+            swing_len: 5,
+            atr_mult: 0.5,
+        }
+    }
+}
+
+// ── Indicator wrapper ─────────────────────────────────────────────────────────
+
+/// Batch `Indicator` adapter for [`MarketStructure`].
+///
+/// Replays candles through the structure engine and emits per-bar:
+/// `struct_bias`, `struct_fib618`, `struct_fib500`,
+/// `struct_in_discount`, `struct_in_premium`,
+/// `struct_bos`, `struct_choch`, `struct_confluence`.
+#[derive(Debug, Clone)]
+pub struct StructureIndicator {
+    pub params: StructureParams,
+}
+
+impl StructureIndicator {
+    pub fn new(params: StructureParams) -> Self {
+        Self { params }
+    }
+    pub fn with_defaults() -> Self {
+        Self::new(StructureParams::default())
+    }
+}
+
+impl Indicator for StructureIndicator {
+    fn name(&self) -> &str {
+        "Structure"
+    }
+    /// `swing_len * 4 + 10` mirrors the internal `maxlen` in [`MarketStructure`].
+    fn required_len(&self) -> usize {
+        self.params.swing_len * 4 + 10
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let p = &self.params;
+        let mut ms = MarketStructure::new(p.swing_len, p.atr_mult);
+        let n = candles.len();
+        let mut bias = vec![f64::NAN; n];
+        let mut fib618 = vec![f64::NAN; n];
+        let mut fib500 = vec![f64::NAN; n];
+        let mut in_discount = vec![f64::NAN; n];
+        let mut in_premium = vec![f64::NAN; n];
+        let mut bos = vec![f64::NAN; n];
+        let mut choch = vec![f64::NAN; n];
+        let mut confluence = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            ms.update(c);
+            bias[i] = ms.bias as f64;
+            fib618[i] = ms.fib618.unwrap_or(f64::NAN);
+            fib500[i] = ms.fib500.unwrap_or(f64::NAN);
+            in_discount[i] = if ms.in_discount { 1.0 } else { 0.0 };
+            in_premium[i] = if ms.in_premium { 1.0 } else { 0.0 };
+            bos[i] = if ms.bos { 1.0 } else { 0.0 };
+            choch[i] = if ms.choch { 1.0 } else { 0.0 };
+            confluence[i] = ms.confluence;
+        }
+        Ok(IndicatorOutput::from_pairs([
+            ("struct_bias", bias),
+            ("struct_fib618".into(), fib618),
+            ("struct_fib500".into(), fib500),
+            ("struct_in_discount".into(), in_discount),
+            ("struct_in_premium".into(), in_premium),
+            ("struct_bos".into(), bos),
+            ("struct_choch".into(), choch),
+            ("struct_confluence".into(), confluence),
+        ]))
+    }
+}
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
-    let period = param_usize(params, "period", 20)?;
-    let std_dev = param_f64(params, "std_dev", 2.0)?;
-    let column = match param_str(params, "column", "close") {
-        "open" => PriceColumn::Open,
-        "high" => PriceColumn::High,
-        "low" => PriceColumn::Low,
-        _ => PriceColumn::Close,
-    };
-    Ok(Box::new(BollingerBands::new(BollingerParams {
-        period,
-        std_dev,
-        column,
+    let swing_len = param_usize(params, "swing_len", 5)?;
+    let atr_mult = param_f64(params, "atr_mult", 0.5)?;
+    Ok(Box::new(StructureIndicator::new(StructureParams {
+        swing_len,
+        atr_mult,
     })))
 }
 
+#[derive(Debug)]
 pub struct MarketStructure {
     swing_len: usize,
     atr_mult: f64,

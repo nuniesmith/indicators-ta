@@ -24,7 +24,6 @@ use std::sync::{OnceLock, RwLock};
 
 use crate::error::IndicatorError;
 use crate::indicator::Indicator;
-use crate::types::Candle;
 
 // ── Factory fn type ───────────────────────────────────────────────────────────
 
@@ -32,7 +31,8 @@ use crate::types::Candle;
 ///
 /// Mirrors Python's `indicator_cls(name=name, params=params)` call in
 /// `IndicatorRegistry.create()`.
-pub type IndicatorFactory = fn(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError>;
+pub type IndicatorFactory =
+    fn(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError>;
 
 // ── Registry ──────────────────────────────────────────────────────────────────
 
@@ -45,7 +45,7 @@ pub struct IndicatorRegistry {
 }
 
 impl IndicatorRegistry {
-    pub const fn new_uninit() -> Self {
+    pub fn new_uninit() -> Self {
         // RwLock::new is not const-stable yet; we use OnceLock wrapping below.
         // This constructor is intentionally left as a marker — use `REGISTRY`.
         Self {
@@ -90,9 +90,11 @@ impl IndicatorRegistry {
         name: &str,
         params: &HashMap<String, String>,
     ) -> Result<Box<dyn Indicator>, IndicatorError> {
-        let factory = self.get(name).ok_or_else(|| IndicatorError::UnknownIndicator {
-            name: name.to_string(),
-        })?;
+        let factory = self
+            .get(name)
+            .ok_or_else(|| IndicatorError::UnknownIndicator {
+                name: name.to_string(),
+            })?;
         factory(params)
     }
 
@@ -127,7 +129,7 @@ pub fn registry() -> &'static IndicatorRegistry {
         crate::volume::register_all(&reg);
         crate::signal::register_all(&reg);
         crate::regime::register_all(&reg);
-        
+        reg
     })
 }
 
@@ -136,7 +138,11 @@ pub fn registry() -> &'static IndicatorRegistry {
 /// Parse a `usize` from the params map with a default fallback.
 ///
 /// Mirrors `self.params.get("period", 14)` in Python.
-pub fn param_usize(params: &HashMap<String, String>, key: &str, default: usize) -> Result<usize, IndicatorError> {
+pub fn param_usize(
+    params: &HashMap<String, String>,
+    key: &str,
+    default: usize,
+) -> Result<usize, IndicatorError> {
     match params.get(key) {
         None => Ok(default),
         Some(s) => s.parse::<usize>().map_err(|_| IndicatorError::InvalidParameter {
@@ -147,7 +153,11 @@ pub fn param_usize(params: &HashMap<String, String>, key: &str, default: usize) 
 }
 
 /// Parse an `f64` from the params map with a default fallback.
-pub fn param_f64(params: &HashMap<String, String>, key: &str, default: f64) -> Result<f64, IndicatorError> {
+pub fn param_f64(
+    params: &HashMap<String, String>,
+    key: &str,
+    default: f64,
+) -> Result<f64, IndicatorError> {
     match params.get(key) {
         None => Ok(default),
         Some(s) => s.parse::<f64>().map_err(|_| IndicatorError::InvalidParameter {
@@ -168,7 +178,9 @@ mod tests {
 
     fn dummy_factory(_p: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
         // Stub: real indicators will provide a real factory.
-        Err(IndicatorError::UnknownIndicator { name: "dummy".into() })
+        Err(IndicatorError::UnknownIndicator {
+            name: "dummy".into(),
+        })
     }
 
     #[test]
@@ -188,7 +200,9 @@ mod tests {
         let reg = IndicatorRegistry {
             entries: RwLock::new(HashMap::new()),
         };
-        let err = reg.create("no_such_indicator", &HashMap::new()).unwrap_err();
+        let err = reg
+            .create("no_such_indicator", &HashMap::new())
+            .unwrap_err();
         assert!(matches!(err, IndicatorError::UnknownIndicator { .. }));
     }
 

@@ -66,7 +66,10 @@ impl Ema {
     }
 
     pub fn with_period(period: usize) -> Self {
-        Self::new(EmaParams { period, ..Default::default() })
+        Self::new(EmaParams {
+            period,
+            ..Default::default()
+        })
     }
 
     fn output_key(&self) -> String {
@@ -95,8 +98,8 @@ impl Indicator for Ema {
         self.check_len(candles)?;
 
         let prices = self.params.column.extract(candles);
-        let alpha = self.params.effective_alpha();
-        let n = prices.len();
+        let _alpha = self.params.effective_alpha();
+        let _n = prices.len();
         let period = self.params.period;
 
         // TODO: honour custom alpha; functions::ema() uses 2/(period+1) only.
@@ -125,7 +128,11 @@ pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, I
         "low" => PriceColumn::Low,
         _ => PriceColumn::Close,
     };
-    Ok(Box::new(Ema::new(EmaParams { period, alpha, column })))
+    Ok(Box::new(Ema::new(EmaParams {
+        period,
+        alpha,
+        column,
+    })))
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

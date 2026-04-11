@@ -24,28 +24,46 @@ pub struct ElderRayParams {
     /// EMA period for the base line.  Python default: 14.
     pub fast_period: usize,
 }
-impl Default for ElderRayParams { fn default() -> Self { Self { fast_period: 14 } } }
+impl Default for ElderRayParams {
+    fn default() -> Self {
+        Self { fast_period: 14 }
+    }
+}
 
 #[derive(Debug, Clone)]
-pub struct ElderRayIndex { pub params: ElderRayParams }
+pub struct ElderRayIndex {
+    pub params: ElderRayParams,
+}
 
 impl ElderRayIndex {
-    pub fn new(params: ElderRayParams) -> Self { Self { params } }
-    pub fn with_period(period: usize) -> Self { Self::new(ElderRayParams { fast_period: period }) }
+    pub fn new(params: ElderRayParams) -> Self {
+        Self { params }
+    }
+    pub fn with_period(period: usize) -> Self {
+        Self::new(ElderRayParams {
+            fast_period: period,
+        })
+    }
 }
 
 impl Indicator for ElderRayIndex {
-    fn name(&self) -> &str { "ElderRayIndex" }
-    fn required_len(&self) -> usize { self.params.fast_period }
-    fn required_columns(&self) -> &[&'static str] { &["high", "low", "close"] }
+    fn name(&self) -> &str {
+        "ElderRayIndex"
+    }
+    fn required_len(&self) -> usize {
+        self.params.fast_period
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close"]
+    }
 
     /// TODO: port Python EMA-based bull/bear power.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
         let close: Vec<f64> = candles.iter().map(|c| c.close).collect();
-        let high:  Vec<f64> = candles.iter().map(|c| c.high).collect();
-        let low:   Vec<f64> = candles.iter().map(|c| c.low).collect();
+        let high: Vec<f64> = candles.iter().map(|c| c.high).collect();
+        let low: Vec<f64> = candles.iter().map(|c| c.low).collect();
 
         let ema = functions::ema(&close, self.params.fast_period)?;
 
@@ -60,7 +78,9 @@ impl Indicator for ElderRayIndex {
 }
 
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
-    Ok(Box::new(ElderRayIndex::new(ElderRayParams { fast_period: param_usize(params, "fast_period", 14)? })))
+    Ok(Box::new(ElderRayIndex::new(ElderRayParams {
+        fast_period: param_usize(params, "fast_period", 14)?,
+    })))
 }
 
 #[cfg(test)]
@@ -88,7 +108,9 @@ mod tests {
         let bull = out.get("ElderRay_bull").unwrap();
         let bear = out.get("ElderRay_bear").unwrap();
         for i in 5..20 {
-            if !bull[i].is_nan() { assert!(bull[i] >= bear[i], "bull < bear at {i}"); }
+            if !bull[i].is_nan() {
+                assert!(bull[i] >= bear[i], "bull < bear at {i}");
+            }
         }
     }
 

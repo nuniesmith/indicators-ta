@@ -3,28 +3,104 @@
 //! Rolling volume profile with configurable price bins. Tracks the Point of Control
 //! (POC), Value Area High/Low, and buy/sell liquidity imbalance.
 
+use std::collections::{HashMap, VecDeque};
+
+use crate::error::IndicatorError;
+use crate::indicator::{Indicator, IndicatorOutput};
+use crate::registry::param_usize;
 use crate::types::Candle;
-use std::collections::VecDeque;
+
+// ── Params ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct LiquidityParams {
+    /// Number of candles in the rolling volume-profile window.
+    pub period: usize,
+    /// Number of price bins in the volume profile.
+    pub n_bins: usize,
+}
+
+impl Default for LiquidityParams {
+    fn default() -> Self {
+        Self {
+            period: 50,
+            n_bins: 20,
+        }
+    }
+}
+
+// ── Indicator wrapper ─────────────────────────────────────────────────────────
+
+/// Batch `Indicator` adapter for [`LiquidityProfile`].
+///
+/// Replays candles through the rolling volume profile and emits per-bar:
+/// `liq_poc`, `liq_buy_pct`, `liq_imbalance`, `liq_vah`, `liq_val`.
+#[derive(Debug, Clone)]
+pub struct LiquidityIndicator {
+    pub params: LiquidityParams,
+}
+
+impl LiquidityIndicator {
+    pub fn new(params: LiquidityParams) -> Self {
+        Self { params }
+    }
+    pub fn with_defaults() -> Self {
+        Self::new(LiquidityParams::default())
+    }
+}
+
+impl Indicator for LiquidityIndicator {
+    fn name(&self) -> &str {
+        "Liquidity"
+    }
+    fn required_len(&self) -> usize {
+        self.params.period
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close", "volume"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let p = &self.params;
+        let mut liq = LiquidityProfile::new(p.period, p.n_bins);
+        let n = candles.len();
+        let mut poc = vec![f64::NAN; n];
+        let mut buy_pct = vec![f64::NAN; n];
+        let mut imbalance = vec![f64::NAN; n];
+        let mut vah = vec![f64::NAN; n];
+        let mut val = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            liq.update(c);
+            poc[i] = liq.poc_price.unwrap_or(f64::NAN);
+            buy_pct[i] = liq.buy_pct;
+            imbalance[i] = liq.imbalance;
+            vah[i] = liq.vah.unwrap_or(f64::NAN);
+            val[i] = liq.val.unwrap_or(f64::NAN);
+        }
+        Ok(IndicatorOutput::from_pairs([
+            ("liq_poc", poc),
+            ("liq_buy_pct".into(), buy_pct),
+            ("liq_imbalance".into(), imbalance),
+            ("liq_vah".into(), vah),
+            ("liq_val".into(), val),
+        ]))
+    }
+}
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
-    let period = param_usize(params, "period", 20)?;
-    let std_dev = param_f64(params, "std_dev", 2.0)?;
-    let column = match param_str(params, "column", "close") {
-        "open" => PriceColumn::Open,
-        "high" => PriceColumn::High,
-        "low" => PriceColumn::Low,
-        _ => PriceColumn::Close,
-    };
-    Ok(Box::new(BollingerBands::new(BollingerParams {
+    let period = param_usize(params, "period", 50)?;
+    let n_bins = param_usize(params, "n_bins", 20)?;
+    Ok(Box::new(LiquidityIndicator::new(LiquidityParams {
         period,
-        std_dev,
-        column,
+        n_bins,
     })))
 }
 
 /// Rolling volume-profile liquidity tracker.
+#[derive(Debug)]
 pub struct LiquidityProfile {
     period: usize,
     n_bins: usize,

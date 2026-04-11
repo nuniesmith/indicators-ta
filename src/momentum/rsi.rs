@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 use crate::error::IndicatorError;
 use crate::indicator::{Indicator, IndicatorOutput, PriceColumn};
-use crate::registry::{param_usize, param_str};
+use crate::registry::{param_str, param_usize};
 use crate::types::Candle;
 
 // ── Params ────────────────────────────────────────────────────────────────────
@@ -33,7 +33,10 @@ pub struct RsiParams {
 
 impl Default for RsiParams {
     fn default() -> Self {
-        Self { period: 14, column: PriceColumn::Close }
+        Self {
+            period: 14,
+            column: PriceColumn::Close,
+        }
     }
 }
 
@@ -45,20 +48,33 @@ pub struct Rsi {
 }
 
 impl Rsi {
-    pub fn new(params: RsiParams) -> Self { Self { params } }
-    pub fn with_period(period: usize) -> Self {
-        Self::new(RsiParams { period, ..Default::default() })
+    pub fn new(params: RsiParams) -> Self {
+        Self { params }
     }
-    fn output_key(&self) -> String { format!("RSI_{}", self.params.period) }
+    pub fn with_period(period: usize) -> Self {
+        Self::new(RsiParams {
+            period,
+            ..Default::default()
+        })
+    }
+    fn output_key(&self) -> String {
+        format!("RSI_{}", self.params.period)
+    }
 }
 
 impl Indicator for Rsi {
-    fn name(&self) -> &str { "RSI" }
+    fn name(&self) -> &str {
+        "RSI"
+    }
 
     /// Need `period + 1` bars: `period` deltas to seed, output starts at index `period`.
-    fn required_len(&self) -> usize { self.params.period + 1 }
+    fn required_len(&self) -> usize {
+        self.params.period + 1
+    }
 
-    fn required_columns(&self) -> &[&'static str] { &["close"] }
+    fn required_columns(&self) -> &[&'static str] {
+        &["close"]
+    }
 
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
@@ -73,7 +89,11 @@ impl Indicator for Rsi {
         let mut avg_loss = 0.0_f64;
         for i in 1..=p {
             let delta = prices[i] - prices[i - 1];
-            if delta > 0.0 { avg_gain += delta; } else { avg_loss += -delta; }
+            if delta > 0.0 {
+                avg_gain += delta;
+            } else {
+                avg_loss += -delta;
+            }
         }
         avg_gain /= p as f64;
         avg_loss /= p as f64;
@@ -108,11 +128,11 @@ fn rsi_from(avg_gain: f64, avg_loss: f64) -> f64 {
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 14)?;
     let column = match param_str(params, "column", "close") {
-        "open"   => PriceColumn::Open,
-        "high"   => PriceColumn::High,
-        "low"    => PriceColumn::Low,
+        "open" => PriceColumn::Open,
+        "high" => PriceColumn::High,
+        "low" => PriceColumn::Low,
         "volume" => PriceColumn::Volume,
-        _        => PriceColumn::Close,
+        _ => PriceColumn::Close,
     };
     Ok(Box::new(Rsi::new(RsiParams { period, column })))
 }

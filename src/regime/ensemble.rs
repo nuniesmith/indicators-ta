@@ -15,7 +15,7 @@ use std::collections::{HashMap, VecDeque};
 use serde::{Deserialize, Serialize};
 
 use super::detector::RegimeDetector;
-use super::hmm::HMMRegimeDetector;
+use super::hmm::{HMMConfig, HMMRegimeDetector};
 use super::types::{MarketRegime, RegimeConfidence, RegimeConfig};
 
 use crate::error::IndicatorError;
@@ -62,7 +62,16 @@ impl Indicator for EnsembleIndicator {
         "EnsembleRegime"
     }
     fn required_len(&self) -> usize {
-        self.indicator_cfg.adx_period * 2 + self.indicator_cfg.regime_stability_bars
+        // Mirror `is_ready()` across all constituent detectors so `check_len`
+        // never passes while the ensemble is still warming up.
+        let adx_warmup =
+            self.indicator_cfg.adx_period * 2 + self.indicator_cfg.regime_stability_bars;
+        let ema_warmup = self.indicator_cfg.ema_long_period;
+        let bb_warmup = self.indicator_cfg.bb_period;
+        // The ensemble creates its HMM with HMMConfig::default(); use that
+        // min_observations as the floor for the HMM warmup.
+        let hmm_warmup = HMMConfig::default().min_observations + 1;
+        adx_warmup.max(ema_warmup).max(bb_warmup).max(hmm_warmup)
     }
     fn required_columns(&self) -> &[&'static str] {
         &["high", "low", "close"]
@@ -83,7 +92,7 @@ impl Indicator for EnsembleIndicator {
             regime[i] = regime_id_from(&res.regime);
         }
         Ok(IndicatorOutput::from_pairs([
-            ("ensemble_conf".into(), conf),
+            ("ensemble_conf", conf),
             ("ensemble_agree".into(), agree),
             ("ensemble_regime".into(), regime),
         ]))

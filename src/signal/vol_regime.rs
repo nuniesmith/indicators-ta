@@ -103,7 +103,7 @@ impl Indicator for VolumeRegime {
         }
 
         Ok(IndicatorOutput::from_pairs([
-            ("vol_pct".into(), vol_pct),
+            ("vol_pct", vol_pct),
             ("vol_regime".into(), vol_regime),
         ]))
     }

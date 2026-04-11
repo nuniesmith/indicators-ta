@@ -16,7 +16,7 @@ use super::types::TrendDirection;
 
 use crate::error::IndicatorError;
 use crate::indicator::{Indicator, IndicatorOutput};
-use crate::registry::{param_f64, param_usize};
+use crate::registry::param_usize;
 use crate::types::Candle;
 
 // ── Indicator wrappers ────────────────────────────────────────────────────────
@@ -52,18 +52,18 @@ impl Indicator for AdxIndicator {
         let n = candles.len();
         let mut adx_out = vec![f64::NAN; n];
         let mut dip_out = vec![f64::NAN; n];
-        let mut dim_out = vec![f64::NAN; n];
+        let mut dmi_out = vec![f64::NAN; n];
         for (i, c) in candles.iter().enumerate() {
             if let Some(v) = adx_calc.update(c.high, c.low, c.close) {
                 adx_out[i] = v;
-                dip_out[i] = adx_calc.di_plus.unwrap_or(f64::NAN);
-                dim_out[i] = adx_calc.di_minus.unwrap_or(f64::NAN);
+                dip_out[i] = adx_calc.di_plus().unwrap_or(f64::NAN);
+                dmi_out[i] = adx_calc.di_minus().unwrap_or(f64::NAN);
             }
         }
         Ok(IndicatorOutput::from_pairs([
-            ("adx".into(), adx_out),
+            ("adx", adx_out),
             ("di_plus".into(), dip_out),
-            ("di_minus".into(), dim_out),
+            ("di_minus".into(), dmi_out),
         ]))
     }
 }
@@ -101,7 +101,7 @@ impl Indicator for AtrPrimIndicator {
                 out[i] = v;
             }
         }
-        Ok(IndicatorOutput::from_pairs([("atr_prim".into(), out)]))
+        Ok(IndicatorOutput::from_pairs([("atr_prim", out)]))
     }
 }
 
@@ -138,7 +138,7 @@ impl Indicator for EmaPrimIndicator {
                 out[i] = v;
             }
         }
-        Ok(IndicatorOutput::from_pairs([("ema_prim".into(), out)]))
+        Ok(IndicatorOutput::from_pairs([("ema_prim", out)]))
     }
 }
 
@@ -175,7 +175,7 @@ impl Indicator for RsiPrimIndicator {
                 out[i] = v;
             }
         }
-        Ok(IndicatorOutput::from_pairs([("rsi_prim".into(), out)]))
+        Ok(IndicatorOutput::from_pairs([("rsi_prim", out)]))
     }
 }
 
@@ -222,7 +222,7 @@ impl Indicator for BbPrimIndicator {
             }
         }
         Ok(IndicatorOutput::from_pairs([
-            ("bb_upper".into(), upper),
+            ("bb_upper", upper),
             ("bb_mid".into(), mid),
             ("bb_lower".into(), lower),
             ("bb_width".into(), width),
@@ -559,6 +559,16 @@ impl ADX {
     /// Get the period
     pub fn period(&self) -> usize {
         self.period
+    }
+
+    /// Current DI+ value (directional index plus), available after warm-up.
+    pub fn di_plus(&self) -> Option<f64> {
+        self.plus_dir_index
+    }
+
+    /// Current DI- value (directional index minus), available after warm-up.
+    pub fn di_minus(&self) -> Option<f64> {
+        self.minus_dir_index
     }
 
     /// Reset the ADX state

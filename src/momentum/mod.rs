@@ -16,9 +16,9 @@ use crate::registry::IndicatorRegistry;
 
 /// Register all momentum indicators with the given registry.
 pub fn register_all(reg: &IndicatorRegistry) {
-    reg.register("rsi",              rsi::factory);
+    reg.register("rsi", rsi::factory);
     reg.register("schafftrendcycle", schaff_trend_cycle::factory);
-    reg.register("stochastic",       stochastic::factory);
-    reg.register("stochasticrsi",    stochastic_rsi::factory);
-    reg.register("williamsr",        williams_r::factory);
+    reg.register("stochastic", stochastic::factory);
+    reg.register("stochasticrsi", stochastic_rsi::factory);
+    reg.register("williamsr", williams_r::factory);
 }

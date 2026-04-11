@@ -29,21 +29,39 @@ pub struct CmfParams {
     /// Rolling period.  Python default: 20.
     pub period: usize,
 }
-impl Default for CmfParams { fn default() -> Self { Self { period: 20 } } }
+impl Default for CmfParams {
+    fn default() -> Self {
+        Self { period: 20 }
+    }
+}
 
 #[derive(Debug, Clone)]
-pub struct ChaikinMoneyFlow { pub params: CmfParams }
+pub struct ChaikinMoneyFlow {
+    pub params: CmfParams,
+}
 
 impl ChaikinMoneyFlow {
-    pub fn new(params: CmfParams) -> Self { Self { params } }
-    pub fn with_period(period: usize) -> Self { Self::new(CmfParams { period }) }
-    fn output_key(&self) -> String { format!("CMF_{}", self.params.period) }
+    pub fn new(params: CmfParams) -> Self {
+        Self { params }
+    }
+    pub fn with_period(period: usize) -> Self {
+        Self::new(CmfParams { period })
+    }
+    fn output_key(&self) -> String {
+        format!("CMF_{}", self.params.period)
+    }
 }
 
 impl Indicator for ChaikinMoneyFlow {
-    fn name(&self) -> &str { "ChaikinMoneyFlow" }
-    fn required_len(&self) -> usize { self.params.period }
-    fn required_columns(&self) -> &[&'static str] { &["high", "low", "close", "volume"] }
+    fn name(&self) -> &str {
+        "ChaikinMoneyFlow"
+    }
+    fn required_len(&self) -> usize {
+        self.params.period
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close", "volume"]
+    }
 
     /// TODO: port Python MFM * Volume rolling-sum CMF.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
@@ -55,8 +73,11 @@ impl Indicator for ChaikinMoneyFlow {
         // Money flow multiplier and volume per bar.
         let mfv: Vec<f64> = candles.iter().map(|c| {
             let range = c.high - c.low;
-            let mfm = if range == 0.0 { 0.0 }
-                      else { ((c.close - c.low) - (c.high - c.close)) / range };
+            let mfm = if range == 0.0 {
+                0.0
+            } else {
+                ((c.close - c.low) - (c.high - c.close)) / range
+            };
             mfm * c.volume
         }).collect();
         let vol: Vec<f64> = candles.iter().map(|c| c.volume).collect();
@@ -66,7 +87,11 @@ impl Indicator for ChaikinMoneyFlow {
         for i in (p - 1)..n {
             let sum_mfv: f64 = mfv[(i + 1 - p)..=i].iter().sum();
             let sum_vol: f64 = vol[(i + 1 - p)..=i].iter().sum();
-            values[i] = if sum_vol == 0.0 { f64::NAN } else { sum_mfv / sum_vol };
+            values[i] = if sum_vol == 0.0 {
+                f64::NAN
+            } else {
+                sum_mfv / sum_vol
+            };
         }
 
         Ok(IndicatorOutput::from_pairs([(self.output_key(), values)]))
@@ -74,7 +99,9 @@ impl Indicator for ChaikinMoneyFlow {
 }
 
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
-    Ok(Box::new(ChaikinMoneyFlow::new(CmfParams { period: param_usize(params, "period", 20)? })))
+    Ok(Box::new(ChaikinMoneyFlow::new(CmfParams {
+        period: param_usize(params, "period", 20)?,
+    })))
 }
 
 #[cfg(test)]
@@ -97,7 +124,9 @@ mod tests {
     fn cmf_range_neg1_to_pos1() {
         let out = ChaikinMoneyFlow::with_period(5).calculate(&candles(10)).unwrap();
         for &v in out.get("CMF_5").unwrap() {
-            if !v.is_nan() { assert!(v >= -1.0 && v <= 1.0, "out of range: {v}"); }
+            if !v.is_nan() {
+                assert!(v >= -1.0 && v <= 1.0, "out of range: {v}");
+            }
         }
     }
 

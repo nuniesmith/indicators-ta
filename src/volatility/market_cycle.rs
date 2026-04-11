@@ -23,15 +23,17 @@ use crate::types::Candle;
 /// Numeric encoding for cycle phases (avoids `String` in `IndicatorOutput`).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CyclePhase {
-    Markup       = 1,
-    Markdown     = -1,
-    Plateau      = 0,
-    Accumulation = 2,   // using 2/-2 to distinguish from Markup/Markdown
+    Markup = 1,
+    Markdown = -1,
+    Plateau = 0,
+    Accumulation = 2, // using 2/-2 to distinguish from Markup/Markdown
     Distribution = -2,
 }
 
 impl CyclePhase {
-    pub fn as_f64(self) -> f64 { self as i32 as f64 }
+    pub fn as_f64(self) -> f64 {
+        self as i32 as f64
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -39,20 +41,36 @@ pub struct MarketCycleParams {
     /// Momentum diff period.  Python default: 1.
     pub momentum_period: usize,
 }
-impl Default for MarketCycleParams { fn default() -> Self { Self { momentum_period: 1 } } }
+impl Default for MarketCycleParams {
+    fn default() -> Self {
+        Self { momentum_period: 1 }
+    }
+}
 
 #[derive(Debug, Clone)]
-pub struct MarketCycle { pub params: MarketCycleParams }
+pub struct MarketCycle {
+    pub params: MarketCycleParams,
+}
 
 impl MarketCycle {
-    pub fn new(params: MarketCycleParams) -> Self { Self { params } }
-    pub fn default() -> Self { Self::new(MarketCycleParams::default()) }
+    pub fn new(params: MarketCycleParams) -> Self {
+        Self { params }
+    }
+    pub fn default() -> Self {
+        Self::new(MarketCycleParams::default())
+    }
 }
 
 impl Indicator for MarketCycle {
-    fn name(&self) -> &str { "MarketCycle" }
-    fn required_len(&self) -> usize { self.params.momentum_period + 1 }
-    fn required_columns(&self) -> &[&'static str] { &["close"] }
+    fn name(&self) -> &str {
+        "MarketCycle"
+    }
+    fn required_len(&self) -> usize {
+        self.params.momentum_period + 1
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["close"]
+    }
 
     /// TODO: port Python momentum-based phase assignment with transition rules.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
@@ -66,9 +84,13 @@ impl Indicator for MarketCycle {
         let mut phases = vec![CyclePhase::Plateau; n];
         for i in mp..n {
             let momentum = close[i] - close[i - mp];
-            phases[i] = if momentum > 0.0 { CyclePhase::Markup }
-                        else if momentum < 0.0 { CyclePhase::Markdown }
-                        else { CyclePhase::Plateau };
+            phases[i] = if momentum > 0.0 {
+                CyclePhase::Markup
+            } else if momentum < 0.0 {
+                CyclePhase::Markdown
+            } else {
+                CyclePhase::Plateau
+            };
         }
 
         // Step 2: apply transition rules (mirrors Python cycle.loc[...] assignments).
@@ -76,17 +98,22 @@ impl Indicator for MarketCycle {
         let mut result = phases.clone();
         for i in 1..n {
             match (phases[i - 1], phases[i]) {
-                (CyclePhase::Markdown, p) if p != CyclePhase::Markdown =>
-                    result[i] = CyclePhase::Accumulation,
-                (CyclePhase::Markup, p) if p != CyclePhase::Markup =>
-                    result[i] = CyclePhase::Distribution,
+                (CyclePhase::Markdown, p) if p != CyclePhase::Markdown => {
+                    result[i] = CyclePhase::Accumulation
+                }
+                (CyclePhase::Markup, p) if p != CyclePhase::Markup => {
+                    result[i] = CyclePhase::Distribution
+                }
                 _ => {}
             }
         }
 
         let values: Vec<f64> = result.iter().map(|p| p.as_f64()).collect();
 
-        Ok(IndicatorOutput::from_pairs([("MarketCycle".to_string(), values)]))
+        Ok(IndicatorOutput::from_pairs([(
+            "MarketCycle".to_string(),
+            values,
+        )]))
     }
 }
 

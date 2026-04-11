@@ -9,22 +9,22 @@
 //! | L6 Confluence | [`confluence`] | [`ConfluenceEngine`] |
 //! | L7 Market Structure + Fibonacci | [`structure`] | [`MarketStructure`] |
 //! | L8 CVD | [`cvd`] | [`CVDTracker`] |
-//! | Aggregator | [`signal`] | [`compute_signal`] · [`SignalStreak`] |
+//! | Aggregator | [`aggregator`] | [`compute_signal`] · [`SignalStreak`] |
 //! | Regime helpers | [`vol_regime`] | [`VolatilityPercentile`] · [`PercentileTracker`] |
 
+pub mod aggregator;
 pub mod confluence;
 pub mod cvd;
 pub mod engine;
 pub mod liquidity;
-pub mod aggregator;
 pub mod structure;
 pub mod vol_regime;
 
 pub use confluence::{ConfluenceEngine, ConfluenceIndicator, ConfluenceParams};
 pub use cvd::{CVDTracker, CvdIndicator, CvdParams};
 pub use engine::{EngineIndicator, Indicators};
-pub use liquidity::{LiquidityIndicator, LiquidityParams, LiquidityProfile};
 pub use aggregator::{SignalComponents, SignalIndicator, SignalStreak, compute_signal};
+pub use liquidity::{LiquidityIndicator, LiquidityParams, LiquidityProfile};
 pub use structure::{MarketStructure, StructureIndicator, StructureParams};
 pub use vol_regime::{
     MarketRegimeTracker, PercentileTracker, VolatilityPercentile, VolumeRegime, VolumeRegimeParams,

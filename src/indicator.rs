@@ -40,9 +40,7 @@ impl IndicatorOutput {
     }
 
     /// Build from an iterator of `(name, values)` pairs.
-    pub fn from_pairs(
-        pairs: impl IntoIterator<Item = (impl Into<String>, Vec<f64>)>,
-    ) -> Self {
+    pub fn from_pairs<K: Into<String>>(pairs: impl IntoIterator<Item = (K, Vec<f64>)>) -> Self {
         let mut out = Self::new();
         for (k, v) in pairs {
             out.insert(k, v);
@@ -118,7 +116,7 @@ impl IndicatorOutput {
 ///     }
 /// }
 /// ```
-pub trait Indicator: Send + Sync {
+pub trait Indicator: Send + Sync + std::fmt::Debug {
     /// Short canonical name, e.g. `"SMA"`, `"RSI"`, `"MACD"`.
     fn name(&self) -> &str;
 

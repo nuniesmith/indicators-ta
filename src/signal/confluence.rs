@@ -74,7 +74,7 @@ impl Indicator for ConfluenceIndicator {
             bear[i] = eng.bear_score;
         }
         Ok(IndicatorOutput::from_pairs([
-            ("confluence_bull".into(), bull),
+            ("confluence_bull", bull),
             ("confluence_bear".into(), bear),
         ]))
     }
@@ -97,6 +97,7 @@ pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, I
     })))
 }
 
+#[derive(Debug)]
 pub struct ConfluenceEngine {
     fast_len: usize,
     slow_len: usize,

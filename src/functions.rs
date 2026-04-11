@@ -5,8 +5,8 @@
 
 use std::collections::VecDeque;
 
-use crate::types::MacdResult;
 use crate::error::IndicatorError;
+use crate::types::MacdResult;
 
 
 // ── Batch functions ───────────────────────────────────────────────────────────

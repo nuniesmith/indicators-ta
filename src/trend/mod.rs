@@ -20,11 +20,11 @@ use crate::registry::IndicatorRegistry;
 
 /// Register all trend indicators with the given registry.
 pub fn register_all(reg: &IndicatorRegistry) {
-    reg.register("atr",              atr::factory);
-    reg.register("ema",              ema::factory);
+    reg.register("atr", atr::factory);
+    reg.register("ema", ema::factory);
     reg.register("linearregression", linear_regression::factory);
-    reg.register("macd",             macd::factory);
-    reg.register("parabolicsar",     parabolic_sar::factory);
-    reg.register("sma",              sma::factory);
-    reg.register("wma",              wma::factory);
+    reg.register("macd", macd::factory);
+    reg.register("parabolicsar", parabolic_sar::factory);
+    reg.register("sma", sma::factory);
+    reg.register("wma", wma::factory);
 }

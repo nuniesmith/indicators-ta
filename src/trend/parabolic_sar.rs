@@ -25,20 +25,39 @@ pub struct PsarParams {
     /// Maximum acceleration factor.  Python default: 0.2.
     pub max_step: f64,
 }
-impl Default for PsarParams { fn default() -> Self { Self { step: 0.02, max_step: 0.2 } } }
+impl Default for PsarParams {
+    fn default() -> Self {
+        Self {
+            step: 0.02,
+            max_step: 0.2,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
-pub struct ParabolicSar { pub params: PsarParams }
+pub struct ParabolicSar {
+    pub params: PsarParams,
+}
 
 impl ParabolicSar {
-    pub fn new(params: PsarParams) -> Self { Self { params } }
-    pub fn default() -> Self { Self::new(PsarParams::default()) }
+    pub fn new(params: PsarParams) -> Self {
+        Self { params }
+    }
+    pub fn default() -> Self {
+        Self::new(PsarParams::default())
+    }
 }
 
 impl Indicator for ParabolicSar {
-    fn name(&self) -> &str { "ParabolicSAR" }
-    fn required_len(&self) -> usize { 2 }
-    fn required_columns(&self) -> &[&'static str] { &["high", "low"] }
+    fn name(&self) -> &str {
+        "ParabolicSAR"
+    }
+    fn required_len(&self) -> usize {
+        2
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low"]
+    }
 
     /// TODO: port Python iterative SAR state machine.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
@@ -89,7 +108,7 @@ impl Indicator for ParabolicSar {
 
 pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(ParabolicSar::new(PsarParams {
-        step:     param_f64(params, "step", 0.02)?,
+        step: param_f64(params, "step", 0.02)?,
         max_step: param_f64(params, "max_step", 0.2)?,
     })))
 }
