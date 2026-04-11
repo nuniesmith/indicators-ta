@@ -18,12 +18,99 @@
 //! indicator snapshots.
 //!
 
-use crate::detector::RegimeDetector;
-use crate::ensemble::{EnsembleConfig, EnsembleRegimeDetector, EnsembleResult};
-use crate::hmm::{HMMConfig, HMMRegimeDetector};
-use crate::types::{MarketRegime, RegimeConfidence, RegimeConfig, TrendDirection};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
+
+use crate::error::IndicatorError;
+use crate::indicator::{Indicator, IndicatorOutput};
+use crate::regime::detector::RegimeDetector;
+use crate::regime::ensemble::{EnsembleConfig, EnsembleRegimeDetector, EnsembleResult};
+use crate::regime::hmm::{HMMConfig, HMMRegimeDetector};
+use crate::registry::param_usize;
+use crate::types::{Candle, MarketRegime, RegimeConfidence, RegimeConfig, TrendDirection};
+
+// ── Indicator wrapper ─────────────────────────────────────────────────────────
+
+/// Batch `Indicator` adapter for [`EnhancedRouter`].
+///
+/// Uses a fixed synthetic symbol `"_batch"` to route candles through the router
+/// and collect per-bar `router_conf` and `router_position_factor`.
+#[derive(Debug, Clone)]
+pub struct RouterIndicator {
+    pub config: EnhancedRouterConfig,
+}
+
+impl RouterIndicator {
+    pub fn new(config: EnhancedRouterConfig) -> Self {
+        Self { config }
+    }
+    pub fn with_defaults() -> Self {
+        Self::new(EnhancedRouterConfig::default())
+    }
+}
+
+fn routed_regime_id(r: &MarketRegime) -> f64 {
+    match r {
+        MarketRegime::MeanReverting => 1.0,
+        MarketRegime::Volatile => 2.0,
+        MarketRegime::Trending(TrendDirection::Bullish) => 3.0,
+        MarketRegime::Trending(TrendDirection::Bearish) => 4.0,
+        MarketRegime::Uncertain => 0.0,
+    }
+}
+
+impl Indicator for RouterIndicator {
+    fn name(&self) -> &str {
+        "Router"
+    }
+    fn required_len(&self) -> usize {
+        self.config.indicator_config.adx_period * 2
+            + self.config.indicator_config.regime_stability_bars
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let mut router = EnhancedRouter::new(self.config.clone());
+        let sym = "_batch";
+        let n = candles.len();
+        let mut conf_out = vec![f64::NAN; n];
+        let mut factor_out = vec![f64::NAN; n];
+        let mut regime_out = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            if let Some(sig) = router.update(sym, c.high, c.low, c.close) {
+                conf_out[i] = sig.confidence;
+                factor_out[i] = sig.position_factor;
+                regime_out[i] = routed_regime_id(&sig.regime);
+            }
+        }
+        Ok(IndicatorOutput::from_pairs([
+            ("router_conf".into(), conf_out),
+            ("router_factor".into(), factor_out),
+            ("router_regime".into(), regime_out),
+        ]))
+    }
+}
+
+// ── Registry factory ──────────────────────────────────────────────────────────
+
+pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+    let adx_period = param_usize(params, "adx_period", 14)?;
+    let bb_period = param_usize(params, "bb_period", 20)?;
+    let indicator_config = RegimeConfig {
+        adx_period,
+        bb_period,
+        ..RegimeConfig::default()
+    };
+    let config = EnhancedRouterConfig {
+        indicator_config,
+        ..EnhancedRouterConfig::default()
+    };
+    Ok(Box::new(RouterIndicator::new(config)))
+}
 
 /// Which detection method to use
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]

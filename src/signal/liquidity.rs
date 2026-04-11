@@ -6,6 +6,24 @@
 use crate::types::Candle;
 use std::collections::VecDeque;
 
+// ── Registry factory ──────────────────────────────────────────────────────────
+
+pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+    let period = param_usize(params, "period", 20)?;
+    let std_dev = param_f64(params, "std_dev", 2.0)?;
+    let column = match param_str(params, "column", "close") {
+        "open" => PriceColumn::Open,
+        "high" => PriceColumn::High,
+        "low" => PriceColumn::Low,
+        _ => PriceColumn::Close,
+    };
+    Ok(Box::new(BollingerBands::new(BollingerParams {
+        period,
+        std_dev,
+        column,
+    })))
+}
+
 /// Rolling volume-profile liquidity tracker.
 pub struct LiquidityProfile {
     period: usize,

@@ -10,8 +10,234 @@
 //! 2. Keeps the crate self-contained with zero internal dependencies
 //! 3. `indicators` can later delegate to these if desired
 
+use std::collections::{HashMap, VecDeque};
+
 use super::types::TrendDirection;
-use std::collections::VecDeque;
+
+use crate::error::IndicatorError;
+use crate::indicator::{Indicator, IndicatorOutput};
+use crate::registry::{param_f64, param_usize};
+use crate::types::Candle;
+
+// ── Indicator wrappers ────────────────────────────────────────────────────────
+
+/// Batch `Indicator` wrapping the regime-internal [`ADX`] primitive.
+///
+/// Outputs `adx`, `di_plus`, and `di_minus` per bar.
+#[derive(Debug, Clone)]
+pub struct AdxIndicator {
+    pub period: usize,
+}
+
+impl AdxIndicator {
+    pub fn new(period: usize) -> Self {
+        Self { period }
+    }
+}
+
+impl Indicator for AdxIndicator {
+    fn name(&self) -> &str {
+        "ADX"
+    }
+    fn required_len(&self) -> usize {
+        self.period * 2
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let mut adx_calc = ADX::new(self.period);
+        let n = candles.len();
+        let mut adx_out = vec![f64::NAN; n];
+        let mut dip_out = vec![f64::NAN; n];
+        let mut dim_out = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            if let Some(v) = adx_calc.update(c.high, c.low, c.close) {
+                adx_out[i] = v;
+                dip_out[i] = adx_calc.di_plus.unwrap_or(f64::NAN);
+                dim_out[i] = adx_calc.di_minus.unwrap_or(f64::NAN);
+            }
+        }
+        Ok(IndicatorOutput::from_pairs([
+            ("adx".into(), adx_out),
+            ("di_plus".into(), dip_out),
+            ("di_minus".into(), dim_out),
+        ]))
+    }
+}
+
+/// Batch `Indicator` wrapping the regime-internal [`ATR`] primitive.
+#[derive(Debug, Clone)]
+pub struct AtrPrimIndicator {
+    pub period: usize,
+}
+
+impl AtrPrimIndicator {
+    pub fn new(period: usize) -> Self {
+        Self { period }
+    }
+}
+
+impl Indicator for AtrPrimIndicator {
+    fn name(&self) -> &str {
+        "AtrPrim"
+    }
+    fn required_len(&self) -> usize {
+        self.period + 1
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let mut atr_calc = ATR::new(self.period);
+        let n = candles.len();
+        let mut out = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            if let Some(v) = atr_calc.update(c.high, c.low, c.close) {
+                out[i] = v;
+            }
+        }
+        Ok(IndicatorOutput::from_pairs([("atr_prim".into(), out)]))
+    }
+}
+
+/// Batch `Indicator` wrapping the regime-internal [`EMA`] primitive.
+#[derive(Debug, Clone)]
+pub struct EmaPrimIndicator {
+    pub period: usize,
+}
+
+impl EmaPrimIndicator {
+    pub fn new(period: usize) -> Self {
+        Self { period }
+    }
+}
+
+impl Indicator for EmaPrimIndicator {
+    fn name(&self) -> &str {
+        "EmaPrim"
+    }
+    fn required_len(&self) -> usize {
+        self.period
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["close"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let mut ema_calc = EMA::new(self.period);
+        let n = candles.len();
+        let mut out = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            if let Some(v) = ema_calc.update(c.close) {
+                out[i] = v;
+            }
+        }
+        Ok(IndicatorOutput::from_pairs([("ema_prim".into(), out)]))
+    }
+}
+
+/// Batch `Indicator` wrapping the regime-internal [`RSI`] primitive.
+#[derive(Debug, Clone)]
+pub struct RsiPrimIndicator {
+    pub period: usize,
+}
+
+impl RsiPrimIndicator {
+    pub fn new(period: usize) -> Self {
+        Self { period }
+    }
+}
+
+impl Indicator for RsiPrimIndicator {
+    fn name(&self) -> &str {
+        "RsiPrim"
+    }
+    fn required_len(&self) -> usize {
+        self.period + 1
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["close"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let mut rsi_calc = RSI::new(self.period);
+        let n = candles.len();
+        let mut out = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            if let Some(v) = rsi_calc.update(c.close) {
+                out[i] = v;
+            }
+        }
+        Ok(IndicatorOutput::from_pairs([("rsi_prim".into(), out)]))
+    }
+}
+
+/// Batch `Indicator` wrapping the regime-internal [`BollingerBands`] primitive.
+///
+/// Outputs `bb_upper`, `bb_mid`, `bb_lower`, and `bb_width` per bar.
+#[derive(Debug, Clone)]
+pub struct BbPrimIndicator {
+    pub period: usize,
+    pub std_dev: f64,
+}
+
+impl BbPrimIndicator {
+    pub fn new(period: usize, std_dev: f64) -> Self {
+        Self { period, std_dev }
+    }
+}
+
+impl Indicator for BbPrimIndicator {
+    fn name(&self) -> &str {
+        "BbPrim"
+    }
+    fn required_len(&self) -> usize {
+        self.period
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["close"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let mut bb = BollingerBands::new(self.period, self.std_dev);
+        let n = candles.len();
+        let mut upper = vec![f64::NAN; n];
+        let mut mid = vec![f64::NAN; n];
+        let mut lower = vec![f64::NAN; n];
+        let mut width = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            if let Some(v) = bb.update(c.close) {
+                upper[i] = v.upper;
+                mid[i] = v.middle;
+                lower[i] = v.lower;
+                width[i] = v.width;
+            }
+        }
+        Ok(IndicatorOutput::from_pairs([
+            ("bb_upper".into(), upper),
+            ("bb_mid".into(), mid),
+            ("bb_lower".into(), lower),
+            ("bb_width".into(), width),
+        ]))
+    }
+}
+
+// ── Registry factory ──────────────────────────────────────────────────────────
+
+/// Default factory registers as `"primitives"` → produces [`AdxIndicator`].
+/// Use the individual wrapper structs directly for EMA, ATR, RSI, or BB.
+pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+    let period = param_usize(params, "period", 14)?;
+    Ok(Box::new(AdxIndicator::new(period)))
+}
 
 // ============================================================================
 // Exponential Moving Average (EMA)

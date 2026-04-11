@@ -10,11 +10,101 @@
 //! - Leveraging different strengths of each approach
 //!
 
+use std::collections::{HashMap, VecDeque};
+
+use serde::{Deserialize, Serialize};
+
 use super::detector::RegimeDetector;
 use super::hmm::HMMRegimeDetector;
 use super::types::{MarketRegime, RegimeConfidence, RegimeConfig};
-use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+
+use crate::error::IndicatorError;
+use crate::indicator::{Indicator, IndicatorOutput};
+use crate::registry::param_usize;
+use crate::types::Candle;
+
+// ── Indicator wrapper ─────────────────────────────────────────────────────────
+
+/// Batch `Indicator` adapter for [`EnsembleRegimeDetector`].
+///
+/// Outputs per-bar `ensemble_conf` and `ensemble_agree` (1 if methods agree, 0 if not).
+#[derive(Debug, Clone)]
+pub struct EnsembleIndicator {
+    pub ensemble_cfg: EnsembleConfig,
+    pub indicator_cfg: RegimeConfig,
+}
+
+impl EnsembleIndicator {
+    pub fn new(ensemble_cfg: EnsembleConfig, indicator_cfg: RegimeConfig) -> Self {
+        Self {
+            ensemble_cfg,
+            indicator_cfg,
+        }
+    }
+    pub fn with_defaults() -> Self {
+        Self::new(EnsembleConfig::default(), RegimeConfig::default())
+    }
+}
+
+fn regime_id_from(r: &MarketRegime) -> f64 {
+    use super::types::TrendDirection;
+    match r {
+        MarketRegime::MeanReverting => 1.0,
+        MarketRegime::Volatile => 2.0,
+        MarketRegime::Trending(TrendDirection::Bullish) => 3.0,
+        MarketRegime::Trending(TrendDirection::Bearish) => 4.0,
+        MarketRegime::Uncertain => 0.0,
+    }
+}
+
+impl Indicator for EnsembleIndicator {
+    fn name(&self) -> &str {
+        "EnsembleRegime"
+    }
+    fn required_len(&self) -> usize {
+        self.indicator_cfg.adx_period * 2 + self.indicator_cfg.regime_stability_bars
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let mut det =
+            EnsembleRegimeDetector::new(self.ensemble_cfg.clone(), self.indicator_cfg.clone());
+        let n = candles.len();
+        let mut conf = vec![f64::NAN; n];
+        let mut agree = vec![f64::NAN; n];
+        let mut regime = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            let res = det.update(c.high, c.low, c.close);
+            conf[i] = res.confidence;
+            agree[i] = if res.methods_agree { 1.0 } else { 0.0 };
+            regime[i] = regime_id_from(&res.regime);
+        }
+        Ok(IndicatorOutput::from_pairs([
+            ("ensemble_conf".into(), conf),
+            ("ensemble_agree".into(), agree),
+            ("ensemble_regime".into(), regime),
+        ]))
+    }
+}
+
+// ── Registry factory ──────────────────────────────────────────────────────────
+
+pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+    let adx_period = param_usize(params, "adx_period", 14)?;
+    let bb_period = param_usize(params, "bb_period", 20)?;
+    let indicator_cfg = RegimeConfig {
+        adx_period,
+        bb_period,
+        ..RegimeConfig::default()
+    };
+    Ok(Box::new(EnsembleIndicator::new(
+        EnsembleConfig::default(),
+        indicator_cfg,
+    )))
+}
 
 /// Configuration for ensemble detector
 #[derive(Debug, Clone, Serialize, Deserialize)]

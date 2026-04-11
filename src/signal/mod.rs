@@ -16,14 +16,28 @@ pub mod confluence;
 pub mod cvd;
 pub mod engine;
 pub mod liquidity;
-pub mod signal;
+pub mod aggregator;
 pub mod structure;
 pub mod vol_regime;
 
-pub use confluence::ConfluenceEngine;
-pub use cvd::CVDTracker;
-pub use engine::Indicators;
-pub use liquidity::LiquidityProfile;
-pub use signal::{SignalComponents, SignalStreak, compute_signal};
-pub use structure::MarketStructure;
-pub use vol_regime::{MarketRegimeTracker, PercentileTracker, VolatilityPercentile};
+pub use confluence::{ConfluenceEngine, ConfluenceIndicator, ConfluenceParams};
+pub use cvd::{CVDTracker, CvdIndicator, CvdParams};
+pub use engine::{EngineIndicator, Indicators};
+pub use liquidity::{LiquidityIndicator, LiquidityParams, LiquidityProfile};
+pub use aggregator::{SignalComponents, SignalIndicator, SignalStreak, compute_signal};
+pub use structure::{MarketStructure, StructureIndicator, StructureParams};
+pub use vol_regime::{
+    MarketRegimeTracker, PercentileTracker, VolatilityPercentile, VolumeRegime, VolumeRegimeParams,
+};
+
+use crate::registry::IndicatorRegistry;
+
+pub fn register_all(reg: &IndicatorRegistry) {
+    reg.register("confluence", confluence::factory);
+    reg.register("cvd", cvd::factory);
+    reg.register("engine", engine::factory);
+    reg.register("liquidity", liquidity::factory);
+    reg.register("signal", aggregator::factory);
+    reg.register("structure", structure::factory);
+    reg.register("vol_regime", vol_regime::factory);
+}

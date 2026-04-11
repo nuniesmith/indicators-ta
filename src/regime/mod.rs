@@ -23,11 +23,26 @@ pub mod router;
 /// Re-exports of crate-level types consumed by regime detector internals.
 pub(crate) mod types;
 
-pub use detector::RegimeDetector;
-pub use ensemble::{EnsembleConfig, EnsembleRegimeDetector, EnsembleResult, EnsembleStatus};
-pub use hmm::{HMMConfig, HMMRegimeDetector};
-pub use primitives::{ADX, BollingerBands, BollingerBandsValues, RSI};
+pub use detector::{DetectorIndicator, RegimeDetector};
+pub use ensemble::{
+    EnsembleConfig, EnsembleIndicator, EnsembleRegimeDetector, EnsembleResult, EnsembleStatus,
+};
+pub use hmm::{HMMConfig, HMMRegimeDetector, HmmIndicator};
+pub use primitives::{
+    ADX, AdxIndicator, AtrPrimIndicator, BbPrimIndicator, BollingerBands, BollingerBandsValues,
+    EmaPrimIndicator, RSI, RsiPrimIndicator,
+};
 pub use router::{
     ActiveStrategy, AssetSummary, DetectionMethod, EnhancedRouter, EnhancedRouterConfig,
-    RoutedSignal,
+    RoutedSignal, RouterIndicator,
 };
+
+use crate::registry::IndicatorRegistry;
+
+pub fn register_all(reg: &IndicatorRegistry) {
+    reg.register("detector", detector::factory);
+    reg.register("ensemble", ensemble::factory);
+    reg.register("hmm", hmm::factory);
+    reg.register("primitives", primitives::factory);
+    reg.register("router", router::factory);
+}

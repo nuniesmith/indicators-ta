@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::functions::IndicatorError;
+use crate::error::IndicatorError;
 
 // ── MACD
 pub type TripleVec = (Vec<f64>, Vec<f64>, Vec<f64>);

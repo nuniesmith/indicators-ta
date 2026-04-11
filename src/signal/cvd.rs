@@ -3,9 +3,89 @@
 //! Estimates buy/sell volume from OHLCV bars and tracks cumulative delta,
 //! slope, and price-CVD divergence.
 
+use std::collections::{HashMap, VecDeque};
+
+use chrono::{NaiveDate, TimeZone, Utc};
+
+use crate::error::IndicatorError;
+use crate::indicator::{Indicator, IndicatorOutput};
+use crate::registry::param_usize;
 use crate::types::Candle;
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
-use std::collections::VecDeque;
+
+// ── Params ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct CvdParams {
+    pub slope_bars: usize,
+    pub div_lookback: usize,
+}
+
+impl Default for CvdParams {
+    fn default() -> Self {
+        Self {
+            slope_bars: 10,
+            div_lookback: 20,
+        }
+    }
+}
+
+// ── Indicator wrapper ─────────────────────────────────────────────────────────
+
+/// Batch `Indicator` adapter for [`CVDTracker`].
+#[derive(Debug, Clone)]
+pub struct CvdIndicator {
+    pub params: CvdParams,
+}
+
+impl CvdIndicator {
+    pub fn new(params: CvdParams) -> Self {
+        Self { params }
+    }
+}
+
+impl Indicator for CvdIndicator {
+    fn name(&self) -> &str {
+        "CVD"
+    }
+    fn required_len(&self) -> usize {
+        self.params.div_lookback + 1
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["open", "high", "low", "close", "volume"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let p = &self.params;
+        let mut tracker = CVDTracker::new(p.slope_bars, p.div_lookback);
+        let n = candles.len();
+        let mut cvd_out = vec![f64::NAN; n];
+        let mut slope = vec![f64::NAN; n];
+        let mut div_out = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            tracker.update(c);
+            cvd_out[i] = tracker.cvd;
+            slope[i] = tracker.cvd_slope;
+            div_out[i] = tracker.divergence as f64;
+        }
+        Ok(IndicatorOutput::from_pairs([
+            ("cvd".into(), cvd_out),
+            ("cvd_slope".into(), slope),
+            ("cvd_div".into(), div_out),
+        ]))
+    }
+}
+
+// ── Registry factory ──────────────────────────────────────────────────────────
+
+pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+    let slope_bars = param_usize(params, "slope_bars", 10)?;
+    let div_lookback = param_usize(params, "div_lookback", 20)?;
+    Ok(Box::new(CvdIndicator::new(CvdParams {
+        slope_bars,
+        div_lookback,
+    })))
+}
 
 pub struct CVDTracker {
     slope_bars: usize,

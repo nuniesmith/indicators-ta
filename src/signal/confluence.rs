@@ -2,8 +2,100 @@
 //!
 //! Scores bullish/bearish confluence from EMA stack, MACD, RSI, ADX, and volume.
 
+use std::collections::{HashMap, VecDeque};
+
+use crate::error::IndicatorError;
+use crate::indicator::{Indicator, IndicatorOutput};
+use crate::registry::param_usize;
 use crate::types::Candle;
-use std::collections::VecDeque;
+
+// ── Params ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct ConfluenceParams {
+    pub fast_len: usize,
+    pub slow_len: usize,
+    pub trend_len: usize,
+    pub rsi_len: usize,
+    pub adx_len: usize,
+}
+
+impl Default for ConfluenceParams {
+    fn default() -> Self {
+        Self {
+            fast_len: 8,
+            slow_len: 21,
+            trend_len: 50,
+            rsi_len: 14,
+            adx_len: 14,
+        }
+    }
+}
+
+// ── Indicator wrapper ─────────────────────────────────────────────────────────
+
+/// Batch `Indicator` adapter for [`ConfluenceEngine`].
+///
+/// Replays the candle slice through the streaming engine and collects per-bar
+/// `bull_score` and `bear_score`.
+#[derive(Debug, Clone)]
+pub struct ConfluenceIndicator {
+    pub params: ConfluenceParams,
+}
+
+impl ConfluenceIndicator {
+    pub fn new(params: ConfluenceParams) -> Self {
+        Self { params }
+    }
+}
+
+impl Indicator for ConfluenceIndicator {
+    fn name(&self) -> &str {
+        "Confluence"
+    }
+    fn required_len(&self) -> usize {
+        self.params.trend_len + 1
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close", "volume"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let p = &self.params;
+        let mut eng =
+            ConfluenceEngine::new(p.fast_len, p.slow_len, p.trend_len, p.rsi_len, p.adx_len);
+        let n = candles.len();
+        let mut bull = vec![f64::NAN; n];
+        let mut bear = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            eng.update(c);
+            bull[i] = eng.bull_score;
+            bear[i] = eng.bear_score;
+        }
+        Ok(IndicatorOutput::from_pairs([
+            ("confluence_bull".into(), bull),
+            ("confluence_bear".into(), bear),
+        ]))
+    }
+}
+
+// ── Registry factory ──────────────────────────────────────────────────────────
+
+pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+    let fast_len = param_usize(params, "fast_len", 8)?;
+    let slow_len = param_usize(params, "slow_len", 21)?;
+    let trend_len = param_usize(params, "trend_len", 50)?;
+    let rsi_len = param_usize(params, "rsi_len", 14)?;
+    let adx_len = param_usize(params, "adx_len", 14)?;
+    Ok(Box::new(ConfluenceIndicator::new(ConfluenceParams {
+        fast_len,
+        slow_len,
+        trend_len,
+        rsi_len,
+        adx_len,
+    })))
+}
 
 pub struct ConfluenceEngine {
     fast_len: usize,

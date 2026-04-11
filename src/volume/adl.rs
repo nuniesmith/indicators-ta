@@ -19,7 +19,7 @@
 
 use std::collections::HashMap;
 
-use crate::functions::IndicatorError;
+use crate::error::IndicatorError;
 use crate::indicator::{Indicator, IndicatorOutput};
 use crate::types::Candle;
 

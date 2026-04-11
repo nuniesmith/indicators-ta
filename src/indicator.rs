@@ -13,7 +13,7 @@
 
 use std::collections::HashMap;
 
-use crate::functions::IndicatorError;
+use crate::error::IndicatorError;
 use crate::types::Candle;
 
 // ── IndicatorOutput ───────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ impl IndicatorOutput {
 ///
 /// ```rust,ignore
 /// use crate::indicator::{Indicator, IndicatorOutput};
-/// use crate::functions::IndicatorError;
+/// use crate::error::IndicatorError;
 /// use crate::types::Candle;
 ///
 /// pub struct Sma {

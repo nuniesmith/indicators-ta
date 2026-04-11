@@ -16,7 +16,7 @@
 
 use std::collections::HashMap;
 
-use crate::functions::IndicatorError;
+use crate::error::IndicatorError;
 use crate::indicator::{Indicator, IndicatorOutput, PriceColumn};
 use crate::registry::{param_usize, param_str};
 use crate::types::Candle;

@@ -14,7 +14,8 @@
 
 use std::collections::HashMap;
 
-use crate::functions::{self, IndicatorError};
+use crate::functions::{self};
+use crate::error::IndicatorError;
 use crate::indicator::{Indicator, IndicatorOutput};
 use crate::registry::{param_f64, param_usize};
 use crate::types::Candle;

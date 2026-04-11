@@ -14,7 +14,7 @@
 
 use std::collections::HashMap;
 
-use crate::functions::IndicatorError;
+use crate::error::IndicatorError;
 use crate::indicator::{Indicator, IndicatorOutput};
 use crate::momentum::rsi::{Rsi, RsiParams};
 use crate::registry::param_usize;

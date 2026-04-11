@@ -12,9 +12,27 @@
 //! - **L11** Price acceleration (2nd derivative, normalised)
 
 use crate::types::Candle;
-use crate::vol_regime::PercentileTracker;
+use crate::signal::vol_regime::PercentileTracker;
 use chrono::{NaiveDate, TimeZone, Utc};
 use std::collections::VecDeque;
+
+// ── Registry factory ──────────────────────────────────────────────────────────
+
+pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+    let period = param_usize(params, "period", 20)?;
+    let std_dev = param_f64(params, "std_dev", 2.0)?;
+    let column = match param_str(params, "column", "close") {
+        "open" => PriceColumn::Open,
+        "high" => PriceColumn::High,
+        "low" => PriceColumn::Low,
+        _ => PriceColumn::Close,
+    };
+    Ok(Box::new(BollingerBands::new(BollingerParams {
+        period,
+        std_dev,
+        column,
+    })))
+}
 
 // ── Config ────────────────────────────────────────────────────────────────────
 

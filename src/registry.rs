@@ -20,9 +20,9 @@
 //! ```
 
 use std::collections::HashMap;
-use std::sync::{Arc, OnceLock, RwLock};
+use std::sync::{OnceLock, RwLock};
 
-use crate::functions::IndicatorError;
+use crate::error::IndicatorError;
 use crate::indicator::Indicator;
 use crate::types::Candle;
 
@@ -123,9 +123,11 @@ pub fn registry() -> &'static IndicatorRegistry {
         // Register all built-in indicators.
         crate::trend::register_all(&reg);
         crate::momentum::register_all(&reg);
+        crate::volatility::register_all(&reg);
         crate::volume::register_all(&reg);
-        crate::other::register_all(&reg);
-        reg
+        crate::signal::register_all(&reg);
+        crate::regime::register_all(&reg);
+        
     })
 }
 

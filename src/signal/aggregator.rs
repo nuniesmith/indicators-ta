@@ -14,13 +14,32 @@
 //! if streak.update(raw) { /* confirmed signal */ }
 //! ```
 
-use crate::confluence::ConfluenceEngine;
-use crate::cvd::CVDTracker;
-use crate::engine::Indicators;
+
 use crate::indicator_config::IndicatorConfig;
-use crate::liquidity::LiquidityProfile;
-use crate::structure::MarketStructure;
-use crate::vol_regime::VolatilityPercentile;
+use crate::signal::confluence::ConfluenceEngine;
+use crate::signal::cvd::CVDTracker;
+use crate::signal::engine::Indicators;
+use crate::signal::liquidity::LiquidityProfile;
+use crate::signal::structure::MarketStructure;
+use crate::signal::vol_regime::VolatilityPercentile;
+
+// ── Registry factory ──────────────────────────────────────────────────────────
+
+pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+    let period = param_usize(params, "period", 20)?;
+    let std_dev = param_f64(params, "std_dev", 2.0)?;
+    let column = match param_str(params, "column", "close") {
+        "open" => PriceColumn::Open,
+        "high" => PriceColumn::High,
+        "low" => PriceColumn::Low,
+        _ => PriceColumn::Close,
+    };
+    Ok(Box::new(BollingerBands::new(BollingerParams {
+        period,
+        std_dev,
+        column,
+    })))
+}
 
 // ── Signal components ─────────────────────────────────────────────────────────
 

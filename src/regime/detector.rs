@@ -7,11 +7,91 @@
 //! learning. It provides immediate classification once indicators are warmed up.
 //!
 
+use std::collections::{HashMap, VecDeque};
+
 use super::primitives::{ADX, ATR, BollingerBands, BollingerBandsValues, EMA};
 use super::types::{
     MarketRegime, RecommendedStrategy, RegimeConfidence, RegimeConfig, TrendDirection,
 };
-use std::collections::VecDeque;
+
+use crate::error::IndicatorError;
+use crate::indicator::{Indicator, IndicatorOutput};
+use crate::registry::param_usize;
+use crate::types::Candle;
+
+// ── Indicator wrapper ─────────────────────────────────────────────────────────
+
+/// Batch `Indicator` adapter for [`RegimeDetector`].
+///
+/// Replays candles through the streaming detector and emits per-bar
+/// `confidence` (0–1) and `regime_id` (0=Uncertain, 1=MeanReverting,
+/// 2=Volatile, 3=TrendingBull, 4=TrendingBear).
+#[derive(Debug, Clone)]
+pub struct DetectorIndicator {
+    pub config: RegimeConfig,
+}
+
+impl DetectorIndicator {
+    pub fn new(config: RegimeConfig) -> Self {
+        Self { config }
+    }
+    pub fn with_defaults() -> Self {
+        Self::new(RegimeConfig::default())
+    }
+}
+
+fn regime_id(r: &MarketRegime) -> f64 {
+    use super::types::TrendDirection;
+    match r {
+        MarketRegime::MeanReverting => 1.0,
+        MarketRegime::Volatile => 2.0,
+        MarketRegime::Trending(TrendDirection::Bullish) => 3.0,
+        MarketRegime::Trending(TrendDirection::Bearish) => 4.0,
+        MarketRegime::Uncertain => 0.0,
+    }
+}
+
+impl Indicator for DetectorIndicator {
+    fn name(&self) -> &str {
+        "RegimeDetector"
+    }
+    fn required_len(&self) -> usize {
+        self.config.adx_period * 2 + self.config.regime_stability_bars
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let mut det = RegimeDetector::new(self.config.clone());
+        let n = candles.len();
+        let mut conf = vec![f64::NAN; n];
+        let mut regime = vec![f64::NAN; n];
+        for (i, c) in candles.iter().enumerate() {
+            let rc = det.update(c.high, c.low, c.close);
+            conf[i] = rc.confidence;
+            regime[i] = regime_id(&rc.regime);
+        }
+        Ok(IndicatorOutput::from_pairs([
+            ("regime_conf".into(), conf),
+            ("regime_id".into(), regime),
+        ]))
+    }
+}
+
+// ── Registry factory ──────────────────────────────────────────────────────────
+
+pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+    let adx_period = param_usize(params, "adx_period", 14)?;
+    let bb_period = param_usize(params, "bb_period", 20)?;
+    let config = RegimeConfig {
+        adx_period,
+        bb_period,
+        ..RegimeConfig::default()
+    };
+    Ok(Box::new(DetectorIndicator::new(config)))
+}
 
 /// Main indicator-based regime detection engine.
 ///

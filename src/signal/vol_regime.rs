@@ -7,7 +7,118 @@
 //! Note: `MarketRegimeTracker` is distinct from the statistical `MarketRegime` enum
 //! in `types.rs` — it is a simpler slope-based classifier used by the signal engine.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
+
+use crate::error::IndicatorError;
+use crate::indicator::{Indicator, IndicatorOutput};
+use crate::registry::param_usize;
+use crate::types::Candle;
+
+// ── Params ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct VolumeRegimeParams {
+    /// ATR period for computing true-range inputs to the percentile tracker.
+    pub atr_period: usize,
+    /// Rolling window for the [`PercentileTracker`].
+    pub pct_window: usize,
+}
+
+impl Default for VolumeRegimeParams {
+    fn default() -> Self {
+        Self {
+            atr_period: 14,
+            pct_window: 100,
+        }
+    }
+}
+
+// ── Indicator struct ──────────────────────────────────────────────────────────
+
+/// Batch `Indicator` wrapping [`VolatilityPercentile`].
+///
+/// Computes a rolling ATR, feeds it into the percentile tracker, and outputs
+/// `vol_pct` (0–1) and `vol_regime` (encoded as 0=VERY_LOW … 4=VERY_HIGH).
+#[derive(Debug, Clone)]
+pub struct VolumeRegime {
+    pub params: VolumeRegimeParams,
+}
+
+impl VolumeRegime {
+    pub fn new(params: VolumeRegimeParams) -> Self {
+        Self { params }
+    }
+    pub fn with_defaults() -> Self {
+        Self::new(VolumeRegimeParams::default())
+    }
+}
+
+impl Indicator for VolumeRegime {
+    fn name(&self) -> &str {
+        "VolumeRegime"
+    }
+    fn required_len(&self) -> usize {
+        self.params.atr_period + 1
+    }
+    fn required_columns(&self) -> &[&'static str] {
+        &["high", "low", "close"]
+    }
+
+    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
+        self.check_len(candles)?;
+        let p = &self.params;
+        let mut tracker = VolatilityPercentile::new(p.pct_window);
+
+        // Incremental ATR (RMA / Wilder smoothing).
+        let mut prev_close: Option<f64> = None;
+        let mut atr_rma: Option<f64> = None;
+        let alpha = 1.0 / p.atr_period as f64;
+
+        let n = candles.len();
+        let mut vol_pct = vec![f64::NAN; n];
+        let mut vol_regime = vec![f64::NAN; n];
+
+        for (i, c) in candles.iter().enumerate() {
+            let tr = match prev_close {
+                None => c.high - c.low,
+                Some(pc) => (c.high - c.low)
+                    .max((c.high - pc).abs())
+                    .max((c.low - pc).abs()),
+            };
+            atr_rma = Some(match atr_rma {
+                None => tr,
+                Some(a) => alpha * tr + (1.0 - alpha) * a,
+            });
+            prev_close = Some(c.close);
+
+            tracker.update(atr_rma);
+            vol_pct[i] = tracker.vol_pct;
+            vol_regime[i] = match tracker.vol_regime {
+                "VERY LOW" => 0.0,
+                "LOW" => 1.0,
+                "HIGH" => 3.0,
+                "VERY HIGH" => 4.0,
+                _ => 2.0, // MED
+            };
+        }
+
+        Ok(IndicatorOutput::from_pairs([
+            ("vol_pct".into(), vol_pct),
+            ("vol_regime".into(), vol_regime),
+        ]))
+    }
+}
+
+// ── Registry factory ──────────────────────────────────────────────────────────
+
+pub fn factory(params: &HashMap<String, String>) -> Result<Box<dyn Indicator>, IndicatorError> {
+    let atr_period = param_usize(params, "atr_period", 14)?;
+    let pct_window = param_usize(params, "pct_window", 100)?;
+    Ok(Box::new(VolumeRegime::new(VolumeRegimeParams {
+        atr_period,
+        pct_window,
+    })))
+}
 
 // ── PercentileTracker ─────────────────────────────────────────────────────────
 
