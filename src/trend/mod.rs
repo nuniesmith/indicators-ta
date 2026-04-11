@@ -1,40 +1,30 @@
-//! Trend indicators.
-//!
-//! Python equivalents:
-//! - `indicators/trend/moving_average.py`  → `sma`, `ema`, `wma`, `vwap`
-//! - `indicators/trend/macd.py`            → `macd`
-//! - `indicators/trend/accumulation_distribution_line.py` → `adl`
-//! - `indicators/trend/volatility/`        → `volatility::{atr, bollinger, keltner}`
+//! Trend indicators: moving averages, ATR, MACD, and linear regression.
 
-pub mod adl;
+pub mod atr;
 pub mod ema;
+pub mod linear_regression;
 pub mod macd;
+pub mod parabolic_sar;
 pub mod sma;
-pub mod vwap;
-pub mod volatility;
 pub mod wma;
 
-pub use adl::Adl;
+pub use atr::Atr;
 pub use ema::Ema;
+pub use linear_regression::LinearRegression;
 pub use macd::Macd;
+pub use parabolic_sar::ParabolicSar;
 pub use sma::Sma;
-pub use vwap::Vwap;
 pub use wma::Wma;
-pub use volatility::{Atr, BollingerBands, KeltnerChannels};
 
 use crate::registry::IndicatorRegistry;
 
-/// Register all trend indicators into the global registry.
-///
-/// Called once from `crate::registry::registry()` at startup.
+/// Register all trend indicators with the given registry.
 pub fn register_all(reg: &IndicatorRegistry) {
-    reg.register("sma", sma::factory);
-    reg.register("ema", ema::factory);
-    reg.register("wma", wma::factory);
-    reg.register("vwap", vwap::factory);
-    reg.register("macd", macd::factory);
-    reg.register("adl", adl::factory);
-    reg.register("atr", volatility::atr::factory);
-    reg.register("bollingerbands", volatility::bollinger::factory);
-    reg.register("keltnerchannel", volatility::keltner::factory);
+    reg.register("atr",              atr::factory);
+    reg.register("ema",              ema::factory);
+    reg.register("linearregression", linear_regression::factory);
+    reg.register("macd",             macd::factory);
+    reg.register("parabolicsar",     parabolic_sar::factory);
+    reg.register("sma",              sma::factory);
+    reg.register("wma",              wma::factory);
 }
