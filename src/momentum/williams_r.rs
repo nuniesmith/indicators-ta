@@ -69,7 +69,10 @@ impl Indicator for WilliamsR {
         // TODO: port Python rolling max/min.
         for i in (p - 1)..n {
             let window = &candles[(i + 1 - p)..=i];
-            let highest_h = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+            let highest_h = window
+                .iter()
+                .map(|c| c.high)
+                .fold(f64::NEG_INFINITY, f64::max);
             let lowest_l = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
             let range = highest_h - lowest_l;
             values[i] = if range == 0.0 {
@@ -94,16 +97,33 @@ mod tests {
     use super::*;
 
     fn candles(data: &[(f64, f64, f64)]) -> Vec<Candle> {
-        data.iter().enumerate().map(|(i, &(h, l, c))| Candle {
-            time: i as i64, open: c, high: h, low: l, close: c, volume: 1.0,
-        }).collect()
+        data.iter()
+            .enumerate()
+            .map(|(i, &(h, l, c))| Candle {
+                time: i as i64,
+                open: c,
+                high: h,
+                low: l,
+                close: c,
+                volume: 1.0,
+            })
+            .collect()
     }
 
     fn rising(n: usize) -> Vec<Candle> {
-        (0..n).map(|i| {
-            let f = i as f64;
-            Candle { time: i as i64, open: f, high: f + 1.0, low: f - 1.0, close: f + 0.5, volume: 1.0 }
-        }).collect()
+        (0..n)
+            .map(|i| {
+                let f = i as f64;
+                Candle {
+                    time: i as i64,
+                    open: f,
+                    high: f + 1.0,
+                    low: f - 1.0,
+                    close: f + 0.5,
+                    volume: 1.0,
+                }
+            })
+            .collect()
     }
 
     #[test]

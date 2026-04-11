@@ -128,14 +128,25 @@ mod tests {
     use super::*;
 
     fn candles(closes: &[f64]) -> Vec<Candle> {
-        closes.iter().enumerate().map(|(i, &c)| Candle {
-            time: i as i64, open: c, high: c, low: c, close: c, volume: 1.0,
-        }).collect()
+        closes
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| Candle {
+                time: i as i64,
+                open: c,
+                high: c,
+                low: c,
+                close: c,
+                volume: 1.0,
+            })
+            .collect()
     }
 
     #[test]
     fn market_cycle_output_column() {
-        let out = MarketCycle::default().calculate(&candles(&[1.0, 2.0, 3.0])).unwrap();
+        let out = MarketCycle::default()
+            .calculate(&candles(&[1.0, 2.0, 3.0]))
+            .unwrap();
         assert!(out.get("MarketCycle").is_some());
     }
 

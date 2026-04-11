@@ -14,7 +14,7 @@ use std::collections::HashMap;
 
 use crate::error::IndicatorError;
 use crate::indicator::{Indicator, IndicatorOutput, PriceColumn};
-use crate::registry::{param_usize, param_str};
+use crate::registry::{param_str, param_usize};
 use crate::types::Candle;
 
 // ── Params ────────────────────────────────────────────────────────────────────
@@ -63,7 +63,10 @@ impl Sma {
 
     /// Convenience constructor with just a period.
     pub fn with_period(period: usize) -> Self {
-        Self::new(SmaParams { period, ..Default::default() })
+        Self::new(SmaParams {
+            period,
+            ..Default::default()
+        })
     }
 
     /// Column label used in `IndicatorOutput`.
@@ -178,7 +181,11 @@ mod tests {
         let sma = Sma::with_period(3);
         let out = sma.calculate(&make_candles(&closes)).unwrap();
         let vals = out.get("SMA_3").unwrap();
-        assert!((vals[2] - 20.0).abs() < 1e-9, "expected 20.0, got {}", vals[2]);
+        assert!(
+            (vals[2] - 20.0).abs() < 1e-9,
+            "expected 20.0, got {}",
+            vals[2]
+        );
     }
 
     #[test]

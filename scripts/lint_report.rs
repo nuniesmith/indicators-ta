@@ -12,7 +12,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
@@ -22,9 +22,9 @@ struct ToolResult {
     output: String,
     /// True if the process exited with code 0.
     exit_ok: bool,
-    /// Number of `error[...]` lines in the output.
+    /// Number of unique `error[...]` diagnostics in the output.
     error_count: usize,
-    /// Number of `warning[...]` lines in the output.
+    /// Number of unique `warning[...]` diagnostics in the output.
     warning_count: usize,
     /// Wall-clock duration in seconds.
     elapsed_secs: f64,
@@ -60,17 +60,6 @@ impl From<io::Error> for AppError {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-fn command_exists(tool: &str) -> bool {
-    // Use `command -v` equivalent: attempt a cheap subprocess call.
-    Command::new("cargo")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok()
-        && tool == "cargo" // cargo is the only tool we need to find
-}
 
 fn check_tool(name: &str) -> Result<(), AppError> {
     let status = Command::new(name)
@@ -134,13 +123,26 @@ fn run_cargo(args: &[&str], workspace_dir: &str, extra_env: &[(&str, &str)]) -> 
     }
 }
 
-/// Count `error[` and `warning[` lines in cargo's diagnostic output.
-/// Cargo uses the format: `error[E0308]: ...` and `warning: ...`
+/// Count per-diagnostic `error[` and `warning[` lines in cargo's output,
+/// excluding cargo's own summary lines ("error: could not compile", etc.)
+/// which would otherwise inflate the counts.
 fn count_diagnostics(output: &str) -> (usize, usize) {
+    // Summary lines emitted by cargo itself — not individual diagnostics.
+    const CARGO_SUMMARY_PREFIXES: &[&str] = &[
+        "error: could not compile",
+        "error: aborting",
+        "warning: build failed",
+    ];
+
+    let is_summary = |line: &str| CARGO_SUMMARY_PREFIXES.iter().any(|p| line.starts_with(p));
+
     let mut errors = 0usize;
     let mut warnings = 0usize;
     for line in output.lines() {
         let trimmed = line.trim_start();
+        if is_summary(trimmed) {
+            continue;
+        }
         if trimmed.starts_with("error[") || trimmed.starts_with("error: ") {
             errors += 1;
         } else if trimmed.starts_with("warning[") || trimmed.starts_with("warning: ") {
@@ -177,6 +179,53 @@ fn overall_status(results: &[&ToolResult]) -> &'static str {
     }
 }
 
+/// ISO-8601 timestamp from the standard library, no subprocess needed.
+fn timestamp_now() -> String {
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    // Minimal formatting without pulling in chrono.
+    let (s, min) = (secs % 60, (secs / 60) % 60);
+    let (h, days) = ((secs / 3600) % 24, secs / 86400);
+    // Days since epoch → approximate calendar date (good enough for a report header).
+    let (y, mo, d) = days_to_ymd(days);
+    format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", y, mo, d, h, min, s)
+}
+
+/// Convert days-since-Unix-epoch to (year, month, day). Handles leap years.
+fn days_to_ymd(mut days: u64) -> (u64, u64, u64) {
+    let mut year = 1970u64;
+    loop {
+        let leap = is_leap(year);
+        let days_in_year = if leap { 366 } else { 365 };
+        if days < days_in_year {
+            break;
+        }
+        days -= days_in_year;
+        year += 1;
+    }
+    let leap = is_leap(year);
+    let month_days: &[u64] = if leap {
+        &[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    } else {
+        &[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    };
+    let mut month = 1u64;
+    for &md in month_days {
+        if days < md {
+            break;
+        }
+        days -= md;
+        month += 1;
+    }
+    (year, month, days + 1)
+}
+
+fn is_leap(y: u64) -> bool {
+    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+}
+
 // ── report ────────────────────────────────────────────────────────────────────
 
 fn write_report(
@@ -188,6 +237,13 @@ fn write_report(
     test: &ToolResult,
     doc: &ToolResult,
 ) -> Result<(), AppError> {
+    // Ensure the output directory exists.
+    if let Some(parent) = Path::new(path).parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+
     let all = [fmt, clippy, test, doc];
 
     let report = format!(
@@ -296,15 +352,9 @@ fn run() -> Result<bool, AppError> {
         return Err(AppError::MissingWorkspaceDir(workspace_dir.to_string()));
     }
     check_tool("cargo")?;
-
-    // Ensure clippy and rustfmt components are present.
     check_tool("rustfmt")?;
 
-    let timestamp = Command::new("date")
-        .arg("+%Y-%m-%d %H:%M:%S")
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        .unwrap_or_else(|_| "unknown".to_string());
+    let timestamp = timestamp_now();
 
     eprintln!("Running Rust checks on '{}' …", workspace_dir);
 
@@ -312,10 +362,13 @@ fn run() -> Result<bool, AppError> {
     let fmt = run_cargo(&["fmt", "--all", "--", "--check"], workspace_dir, &[]);
 
     // 2. Clippy — treat warnings as errors to match CI.
+    //    Pass -D warnings only via the `--` flag so it applies to clippy lints
+    //    only. Setting RUSTFLAGS=-D warnings would also affect all dependencies
+    //    and proc-macros, causing spurious failures in third-party crates.
     let clippy = run_cargo(
         &["clippy", "--all-targets", "--", "-D", "warnings"],
         workspace_dir,
-        &[("RUSTFLAGS", "-D warnings")],
+        &[],
     );
 
     // 3. Tests — full suite with all features.

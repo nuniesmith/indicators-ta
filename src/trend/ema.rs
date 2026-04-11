@@ -17,10 +17,10 @@
 
 use std::collections::HashMap;
 
-use crate::functions::{self};
 use crate::error::IndicatorError;
+use crate::functions::{self};
 use crate::indicator::{Indicator, IndicatorOutput, PriceColumn};
-use crate::registry::{param_f64, param_usize, param_str};
+use crate::registry::{param_f64, param_str, param_usize};
 use crate::types::Candle;
 
 // ── Params ────────────────────────────────────────────────────────────────────
@@ -142,9 +142,18 @@ mod tests {
     use super::*;
 
     fn candles(closes: &[f64]) -> Vec<Candle> {
-        closes.iter().enumerate().map(|(i, &c)| Candle {
-            time: i as i64, open: c, high: c, low: c, close: c, volume: 1.0,
-        }).collect()
+        closes
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| Candle {
+                time: i as i64,
+                open: c,
+                high: c,
+                low: c,
+                close: c,
+                volume: 1.0,
+            })
+            .collect()
     }
 
     #[test]

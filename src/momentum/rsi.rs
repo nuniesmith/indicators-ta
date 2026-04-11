@@ -144,21 +144,34 @@ mod tests {
     use super::*;
 
     fn make_candles(closes: &[f64]) -> Vec<Candle> {
-        closes.iter().enumerate().map(|(i, &c)| Candle {
-            time: i as i64, open: c, high: c, low: c, close: c, volume: 1.0,
-        }).collect()
+        closes
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| Candle {
+                time: i as i64,
+                open: c,
+                high: c,
+                low: c,
+                close: c,
+                volume: 1.0,
+            })
+            .collect()
     }
 
     #[test]
     fn rsi_insufficient_data() {
-        let err = Rsi::with_period(14).calculate(&make_candles(&[1.0; 10])).unwrap_err();
+        let err = Rsi::with_period(14)
+            .calculate(&make_candles(&[1.0; 10]))
+            .unwrap_err();
         assert!(matches!(err, IndicatorError::InsufficientData { .. }));
     }
 
     #[test]
     fn rsi_leading_nans() {
         let prices: Vec<f64> = (0..20).map(|i| i as f64).collect();
-        let out = Rsi::with_period(14).calculate(&make_candles(&prices)).unwrap();
+        let out = Rsi::with_period(14)
+            .calculate(&make_candles(&prices))
+            .unwrap();
         let vals = out.get("RSI_14").unwrap();
         for i in 0..14 {
             assert!(vals[i].is_nan(), "expected NaN at [{i}], got {}", vals[i]);
@@ -170,7 +183,9 @@ mod tests {
     fn rsi_constant_gains_is_100() {
         // All deltas positive → avg_loss=0, avg_gain>0 → RSI=100.
         let prices: Vec<f64> = (0..20).map(|i| i as f64).collect();
-        let out = Rsi::with_period(14).calculate(&make_candles(&prices)).unwrap();
+        let out = Rsi::with_period(14)
+            .calculate(&make_candles(&prices))
+            .unwrap();
         for &v in out.get("RSI_14").unwrap().iter().filter(|v| !v.is_nan()) {
             assert!((v - 100.0).abs() < 1e-9, "expected 100.0, got {v}");
         }
@@ -180,7 +195,9 @@ mod tests {
     fn rsi_constant_losses_is_0() {
         // All deltas negative → avg_gain=0, avg_loss>0 → RSI=0.
         let prices: Vec<f64> = (0..20).map(|i| 100.0 - i as f64).collect();
-        let out = Rsi::with_period(14).calculate(&make_candles(&prices)).unwrap();
+        let out = Rsi::with_period(14)
+            .calculate(&make_candles(&prices))
+            .unwrap();
         for &v in out.get("RSI_14").unwrap().iter().filter(|v| !v.is_nan()) {
             assert!(v.abs() < 1e-9, "expected 0.0, got {v}");
         }
@@ -195,7 +212,9 @@ mod tests {
             let last = *prices.last().unwrap();
             prices.push(if i % 2 == 0 { last + 1.0 } else { last - 1.0 });
         }
-        let out = Rsi::with_period(14).calculate(&make_candles(&prices)).unwrap();
+        let out = Rsi::with_period(14)
+            .calculate(&make_candles(&prices))
+            .unwrap();
         assert!((out.get("RSI_14").unwrap()[14] - 50.0).abs() < 1e-9);
     }
 
@@ -227,10 +246,16 @@ mod tests {
 
     #[test]
     fn rsi_stays_in_range() {
-        let prices: Vec<f64> = (0..50).map(|i| 100.0 + (i as f64 * 0.3).sin() * 10.0).collect();
-        let out = Rsi::with_period(14).calculate(&make_candles(&prices)).unwrap();
+        let prices: Vec<f64> = (0..50)
+            .map(|i| 100.0 + (i as f64 * 0.3).sin() * 10.0)
+            .collect();
+        let out = Rsi::with_period(14)
+            .calculate(&make_candles(&prices))
+            .unwrap();
         for &v in out.get("RSI_14").unwrap() {
-            if !v.is_nan() { assert!(v >= 0.0 && v <= 100.0, "out of range: {v}"); }
+            if !v.is_nan() {
+                assert!(v >= 0.0 && v <= 100.0, "out of range: {v}");
+            }
         }
     }
 

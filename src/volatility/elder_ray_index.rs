@@ -13,8 +13,8 @@
 
 use std::collections::HashMap;
 
-use crate::functions::{self};
 use crate::error::IndicatorError;
+use crate::functions::{self};
 use crate::indicator::{Indicator, IndicatorOutput};
 use crate::registry::param_usize;
 use crate::types::Candle;
@@ -88,15 +88,23 @@ mod tests {
     use super::*;
 
     fn candles(n: usize) -> Vec<Candle> {
-        (0..n).map(|i| Candle {
-            time: i as i64, open: 10.0, high: 12.0, low: 8.0,
-            close: 10.0 + i as f64 * 0.1, volume: 100.0,
-        }).collect()
+        (0..n)
+            .map(|i| Candle {
+                time: i as i64,
+                open: 10.0,
+                high: 12.0,
+                low: 8.0,
+                close: 10.0 + i as f64 * 0.1,
+                volume: 100.0,
+            })
+            .collect()
     }
 
     #[test]
     fn elder_ray_two_columns() {
-        let out = ElderRayIndex::with_period(14).calculate(&candles(20)).unwrap();
+        let out = ElderRayIndex::with_period(14)
+            .calculate(&candles(20))
+            .unwrap();
         assert!(out.get("ElderRay_bull").is_some());
         assert!(out.get("ElderRay_bear").is_some());
     }
@@ -104,7 +112,9 @@ mod tests {
     #[test]
     fn bull_power_is_high_minus_ema() {
         // Bull power must always be >= bear power (high >= low).
-        let out = ElderRayIndex::with_period(5).calculate(&candles(20)).unwrap();
+        let out = ElderRayIndex::with_period(5)
+            .calculate(&candles(20))
+            .unwrap();
         let bull = out.get("ElderRay_bull").unwrap();
         let bear = out.get("ElderRay_bear").unwrap();
         for i in 5..20 {

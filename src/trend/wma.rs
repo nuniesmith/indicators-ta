@@ -20,7 +20,7 @@ use std::collections::HashMap;
 
 use crate::error::IndicatorError;
 use crate::indicator::{Indicator, IndicatorOutput, PriceColumn};
-use crate::registry::{param_usize, param_str};
+use crate::registry::{param_str, param_usize};
 use crate::types::Candle;
 
 // ── Params ────────────────────────────────────────────────────────────────────
@@ -128,20 +128,35 @@ mod tests {
     use super::*;
 
     fn candles(closes: &[f64]) -> Vec<Candle> {
-        closes.iter().enumerate().map(|(i, &c)| Candle {
-            time: i as i64, open: c, high: c, low: c, close: c, volume: 1.0,
-        }).collect()
+        closes
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| Candle {
+                time: i as i64,
+                open: c,
+                high: c,
+                low: c,
+                close: c,
+                volume: 1.0,
+            })
+            .collect()
     }
 
     #[test]
     fn wma_insufficient_data() {
-        assert!(Wma::with_period(5).calculate(&candles(&[1.0, 2.0])).is_err());
+        assert!(
+            Wma::with_period(5)
+                .calculate(&candles(&[1.0, 2.0]))
+                .is_err()
+        );
     }
 
     #[test]
     fn wma_period3_known_value() {
         // weights [1,2,3], sum=6; prices [1,2,3] → (1+4+9)/6 = 14/6 ≈ 2.333
-        let out = Wma::with_period(3).calculate(&candles(&[1.0, 2.0, 3.0])).unwrap();
+        let out = Wma::with_period(3)
+            .calculate(&candles(&[1.0, 2.0, 3.0]))
+            .unwrap();
         let vals = out.get("WMA_3").unwrap();
         let expected = (1.0 * 1.0 + 2.0 * 2.0 + 3.0 * 3.0) / 6.0;
         assert!((vals[2] - expected).abs() < 1e-9, "got {}", vals[2]);
@@ -149,7 +164,9 @@ mod tests {
 
     #[test]
     fn wma_leading_nans() {
-        let out = Wma::with_period(3).calculate(&candles(&[1.0, 2.0, 3.0, 4.0])).unwrap();
+        let out = Wma::with_period(3)
+            .calculate(&candles(&[1.0, 2.0, 3.0, 4.0]))
+            .unwrap();
         let vals = out.get("WMA_3").unwrap();
         assert!(vals[0].is_nan());
         assert!(vals[1].is_nan());

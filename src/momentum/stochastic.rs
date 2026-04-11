@@ -87,7 +87,10 @@ impl Indicator for Stochastic {
         let mut raw_k = vec![f64::NAN; n];
         for i in (kp - 1)..n {
             let window = &candles[(i + 1 - kp)..=i];
-            let hh = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+            let hh = window
+                .iter()
+                .map(|c| c.high)
+                .fold(f64::NEG_INFINITY, f64::max);
             let ll = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
             let range = hh - ll;
             raw_k[i] = if range == 0.0 {
@@ -153,9 +156,17 @@ mod tests {
 
     fn make_candles(data: &[(f64, f64, f64)]) -> Vec<Candle> {
         // (high, low, close)
-        data.iter().enumerate().map(|(i, &(h, l, c))| Candle {
-            time: i as i64, open: c, high: h, low: l, close: c, volume: 1.0,
-        }).collect()
+        data.iter()
+            .enumerate()
+            .map(|(i, &(h, l, c))| Candle {
+                time: i as i64,
+                open: c,
+                high: h,
+                low: l,
+                close: c,
+                volume: 1.0,
+            })
+            .collect()
     }
 
     fn uniform_candles(n: usize, high: f64, low: f64, close: f64) -> Vec<Candle> {
@@ -184,9 +195,13 @@ mod tests {
         // high=12, low=8, close=10 for all bars.
         // raw %K = 100*(10-8)/(12-8) = 50.0.
         // smooth_k=3 SMA of [50,50,50,...] = 50. %D = 50.
-        let out = Stochastic::new(StochParams { k_period: 5, smooth_k: 3, d_period: 3 })
-            .calculate(&uniform_candles(20, 12.0, 8.0, 10.0))
-            .unwrap();
+        let out = Stochastic::new(StochParams {
+            k_period: 5,
+            smooth_k: 3,
+            d_period: 3,
+        })
+        .calculate(&uniform_candles(20, 12.0, 8.0, 10.0))
+        .unwrap();
         let k = out.get("Stoch_K").unwrap();
         let d = out.get("Stoch_D").unwrap();
         let last_k = k.iter().rev().find(|v| !v.is_nan()).copied().unwrap();
@@ -204,9 +219,13 @@ mod tests {
     #[test]
     fn stoch_close_at_high_is_100() {
         // close == high → raw %K = 100.
-        let out = Stochastic::new(StochParams { k_period: 5, smooth_k: 1, d_period: 1 })
-            .calculate(&uniform_candles(10, 12.0, 8.0, 12.0))
-            .unwrap();
+        let out = Stochastic::new(StochParams {
+            k_period: 5,
+            smooth_k: 1,
+            d_period: 1,
+        })
+        .calculate(&uniform_candles(10, 12.0, 8.0, 12.0))
+        .unwrap();
         let k = out.get("Stoch_K").unwrap();
         for &v in k.iter().filter(|v| !v.is_nan()) {
             assert!((v - 100.0).abs() < 1e-9, "expected 100.0, got {v}");
@@ -216,9 +235,13 @@ mod tests {
     #[test]
     fn stoch_close_at_low_is_0() {
         // close == low → raw %K = 0.
-        let out = Stochastic::new(StochParams { k_period: 5, smooth_k: 1, d_period: 1 })
-            .calculate(&uniform_candles(10, 12.0, 8.0, 8.0))
-            .unwrap();
+        let out = Stochastic::new(StochParams {
+            k_period: 5,
+            smooth_k: 1,
+            d_period: 1,
+        })
+        .calculate(&uniform_candles(10, 12.0, 8.0, 8.0))
+        .unwrap();
         let k = out.get("Stoch_K").unwrap();
         for &v in k.iter().filter(|v| !v.is_nan()) {
             assert!(v.abs() < 1e-9, "expected 0.0, got {v}");
@@ -237,7 +260,9 @@ mod tests {
             let f = i as f64;
             data.push((f + 1.0, f - 1.0, f));
         }
-        let out = Stochastic::default().calculate(&make_candles(&data)).unwrap();
+        let out = Stochastic::default()
+            .calculate(&make_candles(&data))
+            .unwrap();
         for &v in out.get("Stoch_K").unwrap() {
             if !v.is_nan() {
                 assert!(v >= 0.0 && v <= 100.0, "K out of range: {v}");
@@ -253,9 +278,13 @@ mod tests {
     #[test]
     fn stoch_no_smoothing_fast_stochastic() {
         // smooth_k=1 → raw %K passed through directly.
-        let out = Stochastic::new(StochParams { k_period: 3, smooth_k: 1, d_period: 1 })
-            .calculate(&uniform_candles(10, 10.0, 0.0, 6.0))
-            .unwrap();
+        let out = Stochastic::new(StochParams {
+            k_period: 3,
+            smooth_k: 1,
+            d_period: 1,
+        })
+        .calculate(&uniform_candles(10, 10.0, 0.0, 6.0))
+        .unwrap();
         // close=6, range=10 → 60.0.
         let k = out.get("Stoch_K").unwrap();
         for &v in k.iter().filter(|v| !v.is_nan()) {

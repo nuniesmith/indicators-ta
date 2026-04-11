@@ -51,17 +51,20 @@ impl Indicator for Adl {
         self.check_len(candles)?;
 
         let mut adl = 0.0f64;
-        let values: Vec<f64> = candles.iter().map(|c| {
-            let range = c.high - c.low;
-            // TODO: port Python mfm formula
-            let mfm = if range == 0.0 {
-                0.0
-            } else {
-                ((c.close - c.low) - (c.high - c.close)) / range
-            };
-            adl += mfm * c.volume;
-            adl
-        }).collect();
+        let values: Vec<f64> = candles
+            .iter()
+            .map(|c| {
+                let range = c.high - c.low;
+                // TODO: port Python mfm formula
+                let mfm = if range == 0.0 {
+                    0.0
+                } else {
+                    ((c.close - c.low) - (c.high - c.close)) / range
+                };
+                adl += mfm * c.volume;
+                adl
+            })
+            .collect();
 
         Ok(IndicatorOutput::from_pairs([("ADL".to_string(), values)]))
     }
@@ -80,7 +83,14 @@ mod tests {
     use super::*;
 
     fn candle(h: f64, l: f64, c: f64, v: f64) -> Candle {
-        Candle { time: 0, open: c, high: h, low: l, close: c, volume: v }
+        Candle {
+            time: 0,
+            open: c,
+            high: h,
+            low: l,
+            close: c,
+            volume: v,
+        }
     }
 
     #[test]

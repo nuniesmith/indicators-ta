@@ -71,15 +71,18 @@ impl Indicator for ChaikinMoneyFlow {
         let p = self.params.period;
 
         // Money flow multiplier and volume per bar.
-        let mfv: Vec<f64> = candles.iter().map(|c| {
-            let range = c.high - c.low;
-            let mfm = if range == 0.0 {
-                0.0
-            } else {
-                ((c.close - c.low) - (c.high - c.close)) / range
-            };
-            mfm * c.volume
-        }).collect();
+        let mfv: Vec<f64> = candles
+            .iter()
+            .map(|c| {
+                let range = c.high - c.low;
+                let mfm = if range == 0.0 {
+                    0.0
+                } else {
+                    ((c.close - c.low) - (c.high - c.close)) / range
+                };
+                mfm * c.volume
+            })
+            .collect();
         let vol: Vec<f64> = candles.iter().map(|c| c.volume).collect();
 
         let mut values = vec![f64::NAN; n];
@@ -109,20 +112,31 @@ mod tests {
     use super::*;
 
     fn candles(n: usize) -> Vec<Candle> {
-        (0..n).map(|i| Candle {
-            time: i as i64, open: 10.0, high: 12.0, low: 8.0, close: 11.0, volume: 100.0,
-        }).collect()
+        (0..n)
+            .map(|i| Candle {
+                time: i as i64,
+                open: 10.0,
+                high: 12.0,
+                low: 8.0,
+                close: 11.0,
+                volume: 100.0,
+            })
+            .collect()
     }
 
     #[test]
     fn cmf_output_column() {
-        let out = ChaikinMoneyFlow::with_period(20).calculate(&candles(25)).unwrap();
+        let out = ChaikinMoneyFlow::with_period(20)
+            .calculate(&candles(25))
+            .unwrap();
         assert!(out.get("CMF_20").is_some());
     }
 
     #[test]
     fn cmf_range_neg1_to_pos1() {
-        let out = ChaikinMoneyFlow::with_period(5).calculate(&candles(10)).unwrap();
+        let out = ChaikinMoneyFlow::with_period(5)
+            .calculate(&candles(10))
+            .unwrap();
         for &v in out.get("CMF_5").unwrap() {
             if !v.is_nan() {
                 assert!(v >= -1.0 && v <= 1.0, "out of range: {v}");

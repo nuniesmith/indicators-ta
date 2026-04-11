@@ -118,10 +118,16 @@ mod tests {
     use super::*;
 
     fn candles(n: usize) -> Vec<Candle> {
-        (0..n).map(|i| Candle {
-            time: i as i64, open: 10.0, high: 10.0 + i as f64 * 0.1,
-            low: 10.0 - i as f64 * 0.05, close: 10.0, volume: 100.0,
-        }).collect()
+        (0..n)
+            .map(|i| Candle {
+                time: i as i64,
+                open: 10.0,
+                high: 10.0 + i as f64 * 0.1,
+                low: 10.0 - i as f64 * 0.05,
+                close: 10.0,
+                volume: 100.0,
+            })
+            .collect()
     }
 
     #[test]
@@ -143,7 +149,9 @@ mod tests {
         let out = ParabolicSar::default().calculate(&candles(50)).unwrap();
         let vals = out.get("PSAR").unwrap();
         // Values should be finite (AF bounded means SAR stays near price).
-        for &v in vals { assert!(v.is_finite(), "non-finite SAR: {v}"); }
+        for &v in vals {
+            assert!(v.is_finite(), "non-finite SAR: {v}");
+        }
     }
 
     #[test]

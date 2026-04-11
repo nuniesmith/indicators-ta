@@ -75,7 +75,10 @@ impl Indicator for ChoppinessIndex {
         for i in (p - 1)..n {
             let window = &candles[(i + 1 - p)..=i];
             let atr_sum: f64 = window.iter().map(|c| c.high - c.low).sum();
-            let max_h = window.iter().map(|c| c.high).fold(f64::NEG_INFINITY, f64::max);
+            let max_h = window
+                .iter()
+                .map(|c| c.high)
+                .fold(f64::NEG_INFINITY, f64::max);
             let min_l = window.iter().map(|c| c.low).fold(f64::INFINITY, f64::min);
             let denom = max_h - min_l;
             values[i] = if denom == 0.0 || log_period == 0.0 {
@@ -100,15 +103,23 @@ mod tests {
     use super::*;
 
     fn candles(n: usize, range: f64) -> Vec<Candle> {
-        (0..n).map(|i| Candle {
-            time: i as i64, open: 10.0, high: 10.0 + range, low: 10.0 - range,
-            close: 10.0, volume: 100.0,
-        }).collect()
+        (0..n)
+            .map(|i| Candle {
+                time: i as i64,
+                open: 10.0,
+                high: 10.0 + range,
+                low: 10.0 - range,
+                close: 10.0,
+                volume: 100.0,
+            })
+            .collect()
     }
 
     #[test]
     fn chop_output_column() {
-        let out = ChoppinessIndex::with_period(14).calculate(&candles(20, 1.0)).unwrap();
+        let out = ChoppinessIndex::with_period(14)
+            .calculate(&candles(20, 1.0))
+            .unwrap();
         assert!(out.get("CHOP_14").is_some());
     }
 
@@ -118,7 +129,9 @@ mod tests {
         // Python: 100 * log10(sum_atr / (max_h - min_l)) / log10(period)
         // With constant bars: sum_atr = period * range, max_h-min_l = range
         // → log10(period) / log10(period) = 1 → CHOP = 100
-        let out = ChoppinessIndex::with_period(14).calculate(&candles(20, 1.0)).unwrap();
+        let out = ChoppinessIndex::with_period(14)
+            .calculate(&candles(20, 1.0))
+            .unwrap();
         let vals = out.get("CHOP_14").unwrap();
         let last = vals.iter().rev().find(|v| !v.is_nan()).copied().unwrap();
         assert!((last - 100.0).abs() < 1e-6, "got {last}");

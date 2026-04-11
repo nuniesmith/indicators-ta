@@ -20,10 +20,10 @@ pub mod liquidity;
 pub mod structure;
 pub mod vol_regime;
 
+pub use aggregator::{SignalComponents, SignalIndicator, SignalStreak, compute_signal};
 pub use confluence::{ConfluenceEngine, ConfluenceIndicator, ConfluenceParams};
 pub use cvd::{CVDTracker, CvdIndicator, CvdParams};
 pub use engine::{EngineIndicator, Indicators};
-pub use aggregator::{SignalComponents, SignalIndicator, SignalStreak, compute_signal};
 pub use liquidity::{LiquidityIndicator, LiquidityParams, LiquidityProfile};
 pub use structure::{MarketStructure, StructureIndicator, StructureParams};
 pub use vol_regime::{

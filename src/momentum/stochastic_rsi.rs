@@ -69,7 +69,8 @@ impl Indicator for StochasticRsi {
     fn required_len(&self) -> usize {
         // RSI needs rsi_period+1 bars; stochastic then needs stoch_period RSI values;
         // then k_smooth and d_period smoothing on top.
-        self.params.rsi_period + 1
+        self.params.rsi_period
+            + 1
             + self.params.stoch_period
             + self.params.k_smooth
             + self.params.d_period
@@ -90,10 +91,14 @@ impl Indicator for StochasticRsi {
         let dp = self.params.d_period;
 
         // ── Step 1: RSI series ────────────────────────────────────────────────
-        let rsi_out = Rsi::new(RsiParams { period: rsi_p, ..Default::default() })
-            .calculate(candles)?;
+        let rsi_out = Rsi::new(RsiParams {
+            period: rsi_p,
+            ..Default::default()
+        })
+        .calculate(candles)?;
         let rsi_key = format!("RSI_{rsi_p}");
-        let rsi: &[f64] = rsi_out.get(&rsi_key)
+        let rsi: &[f64] = rsi_out
+            .get(&rsi_key)
             .ok_or_else(|| IndicatorError::InvalidParam("RSI output missing".into()))?;
 
         // ── Step 2: Stochastic of RSI ─────────────────────────────────────────
@@ -169,9 +174,18 @@ mod tests {
     use super::*;
 
     fn make_candles(closes: &[f64]) -> Vec<Candle> {
-        closes.iter().enumerate().map(|(i, &c)| Candle {
-            time: i as i64, open: c, high: c, low: c, close: c, volume: 1.0,
-        }).collect()
+        closes
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| Candle {
+                time: i as i64,
+                open: c,
+                high: c,
+                low: c,
+                close: c,
+                volume: 1.0,
+            })
+            .collect()
     }
 
     #[test]
@@ -185,8 +199,12 @@ mod tests {
     #[test]
     fn stochrsi_output_columns_exist() {
         let needed = StochasticRsi::default().required_len();
-        let prices: Vec<f64> = (0..needed + 5).map(|i| 100.0 + (i as f64 * 0.4).sin() * 5.0).collect();
-        let out = StochasticRsi::default().calculate(&make_candles(&prices)).unwrap();
+        let prices: Vec<f64> = (0..needed + 5)
+            .map(|i| 100.0 + (i as f64 * 0.4).sin() * 5.0)
+            .collect();
+        let out = StochasticRsi::default()
+            .calculate(&make_candles(&prices))
+            .unwrap();
         assert!(out.get("StochRSI_K").is_some());
         assert!(out.get("StochRSI_D").is_some());
     }
@@ -197,7 +215,9 @@ mod tests {
         let prices: Vec<f64> = (0..needed + 20)
             .map(|i| 100.0 + (i as f64 * 0.25).sin() * 8.0)
             .collect();
-        let out = StochasticRsi::default().calculate(&make_candles(&prices)).unwrap();
+        let out = StochasticRsi::default()
+            .calculate(&make_candles(&prices))
+            .unwrap();
         for &v in out.get("StochRSI_K").unwrap() {
             if !v.is_nan() {
                 assert!(v >= 0.0 && v <= 100.0, "K out of range: {v}");
@@ -215,7 +235,9 @@ mod tests {
         // Constant closes → RSI=50 everywhere → StochRSI range=0 → %K=50 (flat-RSI guard).
         let needed = StochasticRsi::default().required_len();
         let prices = vec![100.0_f64; needed + 5];
-        let out = StochasticRsi::default().calculate(&make_candles(&prices)).unwrap();
+        let out = StochasticRsi::default()
+            .calculate(&make_candles(&prices))
+            .unwrap();
         let k = out.get("StochRSI_K").unwrap();
         for &v in k.iter().filter(|v| !v.is_nan()) {
             assert!((v - 50.0).abs() < 1e-9, "expected 50.0 (neutral), got {v}");
@@ -229,9 +251,21 @@ mod tests {
         let prices: Vec<f64> = (0..needed + 10)
             .map(|i| 100.0 + (i as f64 * 0.5).sin() * 5.0)
             .collect();
-        let out = StochasticRsi::default().calculate(&make_candles(&prices)).unwrap();
-        let k_count = out.get("StochRSI_K").unwrap().iter().filter(|v| !v.is_nan()).count();
-        let d_count = out.get("StochRSI_D").unwrap().iter().filter(|v| !v.is_nan()).count();
+        let out = StochasticRsi::default()
+            .calculate(&make_candles(&prices))
+            .unwrap();
+        let k_count = out
+            .get("StochRSI_K")
+            .unwrap()
+            .iter()
+            .filter(|v| !v.is_nan())
+            .count();
+        let d_count = out
+            .get("StochRSI_D")
+            .unwrap()
+            .iter()
+            .filter(|v| !v.is_nan())
+            .count();
         assert!(d_count <= k_count, "D should have ≤ non-NaN values than K");
     }
 

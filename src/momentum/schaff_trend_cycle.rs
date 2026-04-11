@@ -86,17 +86,27 @@ impl Indicator for SchaffTrendCycle {
         // Step 1: MACD components.
         let short_e = functions::ema(&close, self.params.short_ema)?;
         let long_e = functions::ema(&close, self.params.long_ema)?;
-        let macd_line: Vec<f64> = (0..n).map(|i| {
-            if short_e[i].is_nan() || long_e[i].is_nan() { f64::NAN }
-            else { short_e[i] - long_e[i] }
-        }).collect();
+        let macd_line: Vec<f64> = (0..n)
+            .map(|i| {
+                if short_e[i].is_nan() || long_e[i].is_nan() {
+                    f64::NAN
+                } else {
+                    short_e[i] - long_e[i]
+                }
+            })
+            .collect();
 
         // Signal of MACD (span=9).
         let macd_sig = functions::ema(&macd_line, 9)?;
-        let macd_diff: Vec<f64> = (0..n).map(|i| {
-            if macd_line[i].is_nan() || macd_sig[i].is_nan() { f64::NAN }
-            else { macd_line[i] - macd_sig[i] }
-        }).collect();
+        let macd_diff: Vec<f64> = (0..n)
+            .map(|i| {
+                if macd_line[i].is_nan() || macd_sig[i].is_nan() {
+                    f64::NAN
+                } else {
+                    macd_line[i] - macd_sig[i]
+                }
+            })
+            .collect();
 
         // Step 2: Stochastic of MACD diff.
         let sp = self.params.stoch_period;
@@ -138,18 +148,25 @@ mod tests {
     use super::*;
 
     fn candles(n: usize) -> Vec<Candle> {
-        (0..n).map(|i| Candle {
-            time: i as i64, open: 10.0, high: 10.0 + (i % 5) as f64,
-            low: 10.0 - (i % 3) as f64, close: 10.0 + (i as f64).sin(),
-            volume: 100.0,
-        }).collect()
+        (0..n)
+            .map(|i| Candle {
+                time: i as i64,
+                open: 10.0,
+                high: 10.0 + (i % 5) as f64,
+                low: 10.0 - (i % 3) as f64,
+                close: 10.0 + (i as f64).sin(),
+                volume: 100.0,
+            })
+            .collect()
     }
 
     #[test]
     fn stc_output_column() {
         let p = StcParams::default();
         let needed = p.long_ema + p.stoch_period + p.signal_period + 5;
-        let out = SchaffTrendCycle::default().calculate(&candles(needed)).unwrap();
+        let out = SchaffTrendCycle::default()
+            .calculate(&candles(needed))
+            .unwrap();
         assert!(out.get("STC").is_some());
     }
 

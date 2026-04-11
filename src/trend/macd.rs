@@ -17,8 +17,8 @@
 
 use std::collections::HashMap;
 
-use crate::functions::{self};
 use crate::error::IndicatorError;
+use crate::functions::{self};
 use crate::indicator::{Indicator, IndicatorOutput, PriceColumn};
 use crate::types::Candle;
 
@@ -65,14 +65,18 @@ impl Macd {
 }
 
 impl Indicator for Macd {
-    fn name(&self) -> &str { "MACD" }
+    fn name(&self) -> &str {
+        "MACD"
+    }
 
     fn required_len(&self) -> usize {
         // need enough bars for the slow EMA to warm up plus signal line
         self.params.slow_period + self.params.signal_period
     }
 
-    fn required_columns(&self) -> &[&'static str] { &["close"] }
+    fn required_columns(&self) -> &[&'static str] {
+        &["close"]
+    }
 
     /// Delegates to the existing `crate::functions::macd()`.
     ///
@@ -114,9 +118,18 @@ mod tests {
     use super::*;
 
     fn candles(closes: &[f64]) -> Vec<Candle> {
-        closes.iter().enumerate().map(|(i, &c)| Candle {
-            time: i as i64, open: c, high: c, low: c, close: c, volume: 1.0,
-        }).collect()
+        closes
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| Candle {
+                time: i as i64,
+                open: c,
+                high: c,
+                low: c,
+                close: c,
+                volume: 1.0,
+            })
+            .collect()
     }
 
     #[test]
@@ -132,7 +145,10 @@ mod tests {
         let out = macd.calculate(&candles(&closes)).unwrap();
         assert!(out.get("MACD_line").is_some(), "missing MACD_line");
         assert!(out.get("MACD_signal").is_some(), "missing MACD_signal");
-        assert!(out.get("MACD_histogram").is_some(), "missing MACD_histogram");
+        assert!(
+            out.get("MACD_histogram").is_some(),
+            "missing MACD_histogram"
+        );
     }
 
     #[test]

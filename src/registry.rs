@@ -145,10 +145,12 @@ pub fn param_usize(
 ) -> Result<usize, IndicatorError> {
     match params.get(key) {
         None => Ok(default),
-        Some(s) => s.parse::<usize>().map_err(|_| IndicatorError::InvalidParameter {
-            name: key.to_string(),
-            value: s.parse::<f64>().unwrap_or(f64::NAN),
-        }),
+        Some(s) => s
+            .parse::<usize>()
+            .map_err(|_| IndicatorError::InvalidParameter {
+                name: key.to_string(),
+                value: s.parse::<f64>().unwrap_or(f64::NAN),
+            }),
     }
 }
 
@@ -160,10 +162,12 @@ pub fn param_f64(
 ) -> Result<f64, IndicatorError> {
     match params.get(key) {
         None => Ok(default),
-        Some(s) => s.parse::<f64>().map_err(|_| IndicatorError::InvalidParameter {
-            name: key.to_string(),
-            value: f64::NAN,
-        }),
+        Some(s) => s
+            .parse::<f64>()
+            .map_err(|_| IndicatorError::InvalidParameter {
+                name: key.to_string(),
+                value: f64::NAN,
+            }),
     }
 }
 

@@ -21,10 +21,10 @@
 
 use std::collections::HashMap;
 
-use crate::functions::{self};
 use crate::error::IndicatorError;
+use crate::functions::{self};
 use crate::indicator::{Indicator, IndicatorOutput};
-use crate::registry::{param_usize, param_str};
+use crate::registry::{param_str, param_usize};
 use crate::types::Candle;
 
 // ── Params ────────────────────────────────────────────────────────────────────
@@ -107,7 +107,9 @@ impl Indicator for Atr {
             AtrMethod::Sma => functions::sma(&tr, self.params.period)?,
         };
 
-        let norm: Vec<f64> = atr_vals.iter().zip(&close)
+        let norm: Vec<f64> = atr_vals
+            .iter()
+            .zip(&close)
             .map(|(&a, &c)| if c == 0.0 { f64::NAN } else { a / c * 100.0 })
             .collect();
 
@@ -136,14 +138,24 @@ mod tests {
     use super::*;
 
     fn candles(data: &[(f64, f64, f64)]) -> Vec<Candle> {
-        data.iter().enumerate().map(|(i, &(h, l, c))| Candle {
-            time: i as i64, open: c, high: h, low: l, close: c, volume: 1.0,
-        }).collect()
+        data.iter()
+            .enumerate()
+            .map(|(i, &(h, l, c))| Candle {
+                time: i as i64,
+                open: c,
+                high: h,
+                low: l,
+                close: c,
+                volume: 1.0,
+            })
+            .collect()
     }
 
     #[test]
     fn atr_output_has_both_columns() {
-        let bars: Vec<(f64, f64, f64)> = (1..=20).map(|i| (i as f64 + 1.0, i as f64 - 1.0, i as f64)).collect();
+        let bars: Vec<(f64, f64, f64)> = (1..=20)
+            .map(|i| (i as f64 + 1.0, i as f64 - 1.0, i as f64))
+            .collect();
         let atr = Atr::with_period(5);
         let out = atr.calculate(&candles(&bars)).unwrap();
         assert!(out.get("ATR_5").is_some());
@@ -152,12 +164,18 @@ mod tests {
 
     #[test]
     fn atr_insufficient_data() {
-        assert!(Atr::with_period(14).calculate(&candles(&[(10.0, 8.0, 9.0)])).is_err());
+        assert!(
+            Atr::with_period(14)
+                .calculate(&candles(&[(10.0, 8.0, 9.0)]))
+                .is_err()
+        );
     }
 
     #[test]
     fn atr_normalized_is_percentage() {
-        let bars: Vec<(f64, f64, f64)> = (1..=20).map(|i| (i as f64 + 1.0, i as f64 - 1.0, i as f64)).collect();
+        let bars: Vec<(f64, f64, f64)> = (1..=20)
+            .map(|i| (i as f64 + 1.0, i as f64 - 1.0, i as f64))
+            .collect();
         let atr = Atr::with_period(5);
         let out = atr.calculate(&candles(&bars)).unwrap();
         let atr_vals = out.get("ATR_5").unwrap();
@@ -173,7 +191,11 @@ mod tests {
 
     #[test]
     fn factory_creates_atr() {
-        let params = [("period".into(), "14".into()), ("method".into(), "ema".into())].into();
+        let params = [
+            ("period".into(), "14".into()),
+            ("method".into(), "ema".into()),
+        ]
+        .into();
         let ind = factory(&params).unwrap();
         assert_eq!(ind.name(), "ATR");
     }

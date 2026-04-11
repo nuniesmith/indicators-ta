@@ -239,6 +239,9 @@ mod tests {
         };
         let candles = vec![candle];
         assert_eq!(PriceColumn::Close.extract(&candles), vec![3.0]);
-        assert_eq!(PriceColumn::TypicalPrice.extract(&candles), vec![(4.0 + 2.0 + 3.0) / 3.0]);
+        assert_eq!(
+            PriceColumn::TypicalPrice.extract(&candles),
+            vec![(4.0 + 2.0 + 3.0) / 3.0]
+        );
     }
 }

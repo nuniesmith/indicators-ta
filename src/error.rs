@@ -1,7 +1,6 @@
 use std::error::Error;
 use std::fmt;
 
-
 // ── Error ────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq)]

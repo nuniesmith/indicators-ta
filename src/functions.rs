@@ -8,7 +8,6 @@ use std::collections::VecDeque;
 use crate::error::IndicatorError;
 use crate::types::MacdResult;
 
-
 // ── Batch functions ───────────────────────────────────────────────────────────
 
 /// Exponential Moving Average over a price slice.

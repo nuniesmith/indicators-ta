@@ -20,8 +20,6 @@ RUST_SRC="$SCRIPT_DIR/lint_report.rs"
 BINARY="$SCRIPT_DIR/lint_report_bin"
 
 # ── helpers ────────────────────────────────────────────────────────────────────
-command_exists() { command -v "$1" &>/dev/null; }
-
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 # ── pre-flight ─────────────────────────────────────────────────────────────────
@@ -29,27 +27,34 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 [ -f "$WORKSPACE_DIR/Cargo.toml" ] || die "'$WORKSPACE_DIR' does not look like a Rust workspace (no Cargo.toml)."
 [ -f "$RUST_SRC" ] || die "Rust source '$RUST_SRC' not found."
 
-command_exists cargo  || die "cargo not found — install Rust from https://rustup.rs"
-command_exists rustc  || die "rustc not found — install Rust from https://rustup.rs"
-command_exists rustfmt || die "rustfmt not found — run: rustup component add rustfmt"
-command_exists cargo-clippy &>/dev/null || \
-  cargo clippy --version &>/dev/null    || \
-  die "clippy not found — run: rustup component add clippy"
+command -v cargo  &>/dev/null || die "cargo not found — install Rust from https://rustup.rs"
+command -v rustc  &>/dev/null || die "rustc not found — install Rust from https://rustup.rs"
+command -v rustfmt &>/dev/null || die "rustfmt not found — run: rustup component add rustfmt"
+
+# clippy is invoked as `cargo clippy`, not as a standalone binary.
+cargo clippy --version &>/dev/null || die "clippy not found — run: rustup component add clippy"
 
 # ── build (only when source is newer than binary) ──────────────────────────────
 if [ ! -f "$BINARY" ] || [ "$RUST_SRC" -nt "$BINARY" ]; then
     echo "Building lint_report binary…"
-    # Use the active toolchain's rustc so edition/features stay consistent.
     rustc -O --edition 2021 "$RUST_SRC" -o "$BINARY"
     echo "Build complete."
 else
     echo "lint_report binary is up to date, skipping build."
 fi
 
+# ── ensure output directory exists ────────────────────────────────────────────
+mkdir -p "$(dirname "$OUTPUT")"
+
 # ── run ────────────────────────────────────────────────────────────────────────
 echo "Running lint checks on '$WORKSPACE_DIR'…"
+
+# Disable set -e around the binary call so we can capture its exit code
+# and still print a useful summary line before propagating it.
+set +e
 "$BINARY" "$WORKSPACE_DIR" "$OUTPUT"
 EXIT_CODE=$?
+set -e
 
 echo ""
 if [ $EXIT_CODE -eq 0 ]; then

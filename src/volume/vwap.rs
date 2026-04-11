@@ -85,8 +85,15 @@ impl Indicator for Vwap {
         self.check_len(candles)?;
 
         let n = candles.len();
-        let tp: Vec<f64> = candles.iter().map(|c| (c.high + c.low + c.close) / 3.0).collect();
-        let vp: Vec<f64> = candles.iter().zip(&tp).map(|(c, &t)| t * c.volume).collect();
+        let tp: Vec<f64> = candles
+            .iter()
+            .map(|c| (c.high + c.low + c.close) / 3.0)
+            .collect();
+        let vp: Vec<f64> = candles
+            .iter()
+            .zip(&tp)
+            .map(|(c, &t)| t * c.volume)
+            .collect();
         let vol: Vec<f64> = candles.iter().map(|c| c.volume).collect();
 
         let values = match self.params.period {
@@ -94,15 +101,18 @@ impl Indicator for Vwap {
                 // TODO: cumulative VWAP
                 let mut cum_vp = 0.0f64;
                 let mut cum_vol = 0.0f64;
-                vp.iter().zip(&vol).map(|(&v, &vol)| {
-                    cum_vp += v;
-                    cum_vol += vol;
-                    if cum_vol == 0.0 {
+                vp.iter()
+                    .zip(&vol)
+                    .map(|(&v, &vol)| {
+                        cum_vp += v;
+                        cum_vol += vol;
+                        if cum_vol == 0.0 {
                             f64::NAN
                         } else {
                             cum_vp / cum_vol
                         }
-                }).collect()
+                    })
+                    .collect()
             }
             Some(period) => {
                 // TODO: rolling VWAP
@@ -143,9 +153,17 @@ mod tests {
 
     fn candles(data: &[(f64, f64, f64, f64)]) -> Vec<Candle> {
         // (high, low, close, volume)
-        data.iter().enumerate().map(|(i, &(h, l, c, v))| Candle {
-            time: i as i64, open: c, high: h, low: l, close: c, volume: v,
-        }).collect()
+        data.iter()
+            .enumerate()
+            .map(|(i, &(h, l, c, v))| Candle {
+                time: i as i64,
+                open: c,
+                high: h,
+                low: l,
+                close: c,
+                volume: v,
+            })
+            .collect()
     }
 
     #[test]

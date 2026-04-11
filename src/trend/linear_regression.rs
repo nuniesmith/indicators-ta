@@ -112,16 +112,27 @@ mod tests {
     use super::*;
 
     fn candles(closes: &[f64]) -> Vec<Candle> {
-        closes.iter().enumerate().map(|(i, &c)| Candle {
-            time: i as i64, open: c, high: c, low: c, close: c, volume: 1.0,
-        }).collect()
+        closes
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| Candle {
+                time: i as i64,
+                open: c,
+                high: c,
+                low: c,
+                close: c,
+                volume: 1.0,
+            })
+            .collect()
     }
 
     #[test]
     fn lr_perfect_line_slope_one() {
         // y = x → slope should be 1.0
         let closes: Vec<f64> = (0..14).map(|x| x as f64).collect();
-        let out = LinearRegression::with_period(14).calculate(&candles(&closes)).unwrap();
+        let out = LinearRegression::with_period(14)
+            .calculate(&candles(&closes))
+            .unwrap();
         let vals = out.get("LR_slope_14").unwrap();
         assert!((vals[13] - 1.0).abs() < 1e-9, "got {}", vals[13]);
     }
@@ -129,7 +140,9 @@ mod tests {
     #[test]
     fn lr_constant_slope_zero() {
         let closes = vec![5.0f64; 14];
-        let out = LinearRegression::with_period(14).calculate(&candles(&closes)).unwrap();
+        let out = LinearRegression::with_period(14)
+            .calculate(&candles(&closes))
+            .unwrap();
         let vals = out.get("LR_slope_14").unwrap();
         assert!(vals[13].abs() < 1e-9);
     }
@@ -137,7 +150,9 @@ mod tests {
     #[test]
     fn lr_leading_nans() {
         let closes: Vec<f64> = (0..20).map(|x| x as f64).collect();
-        let out = LinearRegression::with_period(14).calculate(&candles(&closes)).unwrap();
+        let out = LinearRegression::with_period(14)
+            .calculate(&candles(&closes))
+            .unwrap();
         let vals = out.get("LR_slope_14").unwrap();
         assert!(vals[0].is_nan());
         assert!(!vals[13].is_nan());
