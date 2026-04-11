@@ -33,10 +33,8 @@ let atr14  = atr(&highs, &lows, &closes, 14)?;
 use indicators::{
     Indicators, ConfluenceEngine, LiquidityProfile, MarketStructure,
     CVDTracker, VolatilityPercentile, SignalStreak, compute_signal,
-    settings::BotSettings,
 };
 
-let s      = BotSettings::btc();
 let mut ind    = Indicators::new(&s);
 let mut liq    = LiquidityProfile::new(s.liq_period, s.liq_bins);
 let mut conf   = ConfluenceEngine::new(s.conf_ema_fast, s.conf_ema_slow,

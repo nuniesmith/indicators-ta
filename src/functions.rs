@@ -15,6 +15,11 @@ use crate::types::MacdResult;
 pub enum IndicatorError {
     InsufficientData { required: usize, available: usize },
     InvalidParameter { name: String, value: f64 },
+    /// Returned by the registry when `name` is not registered.
+    /// Mirrors Python `IndicatorFactory`: `raise ValueError(f"Indicator not found: {name}")`.
+    UnknownIndicator { name: String },
+    /// General construction-time validation failure (bad param combination, etc.).
+    InvalidParam(String),
 }
 
 impl fmt::Display for IndicatorError {
@@ -29,6 +34,12 @@ impl fmt::Display for IndicatorError {
             ),
             IndicatorError::InvalidParameter { name, value } => {
                 write!(f, "Invalid parameter {name}: {value}")
+            }
+            IndicatorError::UnknownIndicator { name } => {
+                write!(f, "Unknown indicator: '{name}'")
+            }
+            IndicatorError::InvalidParam(msg) => {
+                write!(f, "Invalid parameter: {msg}")
             }
         }
     }

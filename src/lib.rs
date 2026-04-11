@@ -9,10 +9,8 @@
 //! ## Quick start — signal engine
 //! ```rust,ignore
 //! use indicators::{Indicators, ConfluenceEngine, LiquidityProfile, MarketStructure,
-//!                  CVDTracker, VolatilityPercentile, SignalStreak, compute_signal,
-//!                  settings::BotSettings};
+//!                  CVDTracker, VolatilityPercentile, SignalStreak, compute_signal};
 //!
-//! let s = BotSettings::btc();
 //! let mut ind  = Indicators::new(&s);
 //! let mut liq  = LiquidityProfile::new(s.liq_period, s.liq_bins);
 //! let mut conf = ConfluenceEngine::new(s.conf_ema_fast, s.conf_ema_slow,
@@ -44,13 +42,25 @@
 // ── Standalone batch indicator functions ─────────────────────────────────────
 pub mod functions;
 
+// ── Indicator trait system ────────────────────────────────────────────────────
+pub mod indicator;
+pub mod indicator_config;
+pub mod registry;
+
+// ── Grouped indicator implementations ────────────────────────────────────────
+pub mod momentum;
+pub mod trend;
+pub mod volume;
+pub mod other;
+
+// ── Signal aggregator (moved from kucoin-futures) ─────────────────────────────
+pub mod signal;
+
 // ── Python-ported signal engine ───────────────────────────────────────────────
 pub mod confluence; // ConfluenceEngine (Layer 6)
 pub mod cvd; // CVDTracker (Layer 8)
 pub mod engine; // Indicators: VWAP, EMA, SuperTrend, TrendSpeed, Hurst, Accel
 pub mod liquidity; // LiquidityProfile (Layer 5)
-pub mod settings; // BotSettings + per-symbol defaults
-pub mod signal;
 pub mod structure; // MarketStructure + Fibonacci (Layer 7)
 pub mod vol_regime; // PercentileTracker, VolatilityPercentile, MarketRegimeTracker // compute_signal, SignalStreak
 
@@ -62,13 +72,20 @@ pub mod primitives; // ADX, BB, EMA, ATR, RSI used by regime detectors
 pub mod router;
 pub mod types; // MarketRegime enum, RegimeConfidence, RegimeConfig, etc.
 
-// ── Re-exports: signal engine ────────────────────────────────────────────────
+// ── Re-exports: indicator trait + config ────────────────────────────────────
+pub use indicator::{Indicator, IndicatorOutput, PriceColumn};
+pub use indicator_config::IndicatorConfig;
+pub use registry::IndicatorRegistry;
+
+// ── Re-exports: momentum ─────────────────────────────────────────────────────
+pub use momentum::{Rsi, Stochastic, StochasticRsi};
+
+// ── Re-exports: signal ───────────────────────────────────────────────────────
+pub use signal::{SignalComponents, SignalStreak, compute_signal};
 pub use confluence::ConfluenceEngine;
 pub use cvd::CVDTracker;
 pub use engine::Indicators;
 pub use liquidity::LiquidityProfile;
-pub use settings::BotSettings;
-pub use signal::{SignalComponents, SignalStreak, compute_signal};
 pub use structure::MarketStructure;
 pub use vol_regime::{MarketRegimeTracker, PercentileTracker, VolatilityPercentile};
 

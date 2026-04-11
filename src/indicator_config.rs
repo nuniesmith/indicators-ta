@@ -1,33 +1,31 @@
-//! `BotSettings` — typed replacement for Python's `DEFAULT_SETTINGS_*` dicts.
+//! `IndicatorConfig` — the indicator-math subset of `BotSettings`.
 //!
-//! Every field maps 1-to-1 to a key in the Python `SETTINGS` dict so
-//! Optuna-tuned JSON files can be loaded with zero field renaming.
+//! Pure configuration: no I/O, no runtime, no exchange types.
+//! This struct is what `compute_signal` and all indicator constructors need.
+//! `kucoin-futures` embeds this inside `BotSettings` and passes it through.
+//!
+//! # Usage (kucoin-futures side)
+//! ```rust,ignore
+//! use indicators::IndicatorConfig;
+//! use serde::{Deserialize, Serialize};
+//!
+//! #[derive(Serialize, Deserialize)]
+//! pub struct BotSettings {
+//!     pub symbol: String,
+//!     pub leverage: u32,
+//!     // ...runtime fields...
+//!     #[serde(flatten)]
+//!     pub indicator: IndicatorConfig,
+//! }
+//! ```
 
 use serde::{Deserialize, Serialize};
 
-/// Per-symbol bot configuration — mirrors Python `DEFAULT_SETTINGS_BTC`.
-///
-/// Load from JSON with `serde_json::from_str`, or use a `BotSettings::btc()` constructor.
+/// All tunable parameters that live inside indicators and `compute_signal`.
+/// Every field maps 1-to-1 to a key in the Python `SETTINGS` dict so
+/// Optuna-tuned JSON files load with zero field renaming.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BotSettings {
-    pub symbol: String,
-
-    // ── Execution ────────────────────────────────────────────────────────────
-    pub leverage: u32,
-    pub contracts: u32,
-    pub use_market_orders: bool,
-    pub taker_fee: f64,
-    pub maker_fee: f64,
-    pub risk_fraction: f64,
-    pub max_contracts: u32,
-    pub sim_balance: f64,
-
-    // ── Kline fetch ──────────────────────────────────────────────────────────
-    pub kline_interval: String,
-    pub rest_kline_type: String,
-    pub history_candles: usize,
-    pub backtest_candles: usize,
-
+pub struct IndicatorConfig {
     // ── Layer 1-2: VWAP & EMA ────────────────────────────────────────────────
     pub ema_len: usize,
 
@@ -84,38 +82,17 @@ pub struct BotSettings {
     pub hurst_threshold: f64,
     pub hurst_lookback: usize,
 
-    // ── Layer 11: Price Acceleration ─────────────────────────────────────────
+    // ── Layer 11: Price Acceleration / Stop ──────────────────────────────────
     pub stop_atr_mult: f64,
 
     // ── Entry gates ──────────────────────────────────────────────────────────
     pub min_vol_pct: f64,
     pub min_hold_candles: usize,
-
-    // ── Circuit breaker ──────────────────────────────────────────────────────
-    pub breaker_loss_limit: u32,
-    pub breaker_cooldown_sec: u32,
-
-    // ── Live loop ────────────────────────────────────────────────────────────
-    pub heartbeat_interval_sec: u32,
-    pub param_watch_interval_sec: u32,
 }
 
-impl BotSettings {
-    fn base() -> Self {
+impl Default for IndicatorConfig {
+    fn default() -> Self {
         Self {
-            symbol: String::new(),
-            leverage: 5,
-            contracts: 1,
-            use_market_orders: true,
-            taker_fee: 0.0006,
-            maker_fee: 0.0002,
-            risk_fraction: 0.95,
-            max_contracts: 50,
-            sim_balance: 10_000.0,
-            kline_interval: "1min".into(),
-            rest_kline_type: "1".into(),
-            history_candles: 200,
-            backtest_candles: 8000,
             ema_len: 9,
             atr_len: 10,
             st_factor: 3.0,
@@ -154,52 +131,25 @@ impl BotSettings {
             stop_atr_mult: 1.5,
             min_vol_pct: 0.20,
             min_hold_candles: 2,
-            breaker_loss_limit: 3,
-            breaker_cooldown_sec: 900,
-            heartbeat_interval_sec: 30,
-            param_watch_interval_sec: 300,
-        }
-    }
-
-    pub fn btc() -> Self {
-        Self {
-            symbol: "XBTUSDTM".into(),
-            ..Self::base()
-        }
-    }
-
-    pub fn eth() -> Self {
-        Self {
-            symbol: "ETHUSDTM".into(),
-            ..Self::base()
-        }
-    }
-
-    pub fn sol() -> Self {
-        Self {
-            symbol: "SOLUSDTM".into(),
-            ..Self::base()
-        }
-    }
-
-    pub fn by_symbol(symbol: &str) -> Self {
-        match symbol {
-            "XBTUSDTM" => Self::btc(),
-            "ETHUSDTM" => Self::eth(),
-            "SOLUSDTM" => Self::sol(),
-            _ => Self {
-                symbol: symbol.into(),
-                ..Self::base()
-            },
         }
     }
 }
 
-/// Contract multiplier (base asset per contract).
-pub fn contract_value(symbol: &str) -> f64 {
-    match symbol {
-        "ETHUSDTM" => 0.01,
-        "SOLUSDTM" => 1.0,
-        _ => 0.001,
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_signal_mode_is_majority() {
+        assert_eq!(IndicatorConfig::default().signal_mode, "majority");
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let cfg = IndicatorConfig::default();
+        let json = serde_json::to_string(&cfg).unwrap();
+        let back: IndicatorConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.ema_len, cfg.ema_len);
+        assert_eq!(back.signal_mode, cfg.signal_mode);
     }
 }

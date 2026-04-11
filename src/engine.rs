@@ -11,13 +11,79 @@
 //! - **L10** Hurst exponent (R/S analysis, recomputed every 10 bars)
 //! - **L11** Price acceleration (2nd derivative, normalised)
 
-use crate::settings::BotSettings;
 use crate::types::Candle;
 use crate::vol_regime::PercentileTracker;
 use chrono::{NaiveDate, TimeZone, Utc};
 use std::collections::VecDeque;
 
+// ── Config ────────────────────────────────────────────────────────────────────
+
+/// All parameters the indicator engine needs — pure math, no runtime concerns.
+/// ```
+#[derive(Debug, Clone)]
+pub struct IndicatorConfig {
+    /// Candle buffer capacity (typically `history_candles`).
+    pub history_candles: usize,
+    /// Bars needed before SuperTrend is ready.
+    pub training_period: usize,
+
+    // L2
+    pub ema_len: usize,
+
+    // L3
+    pub atr_len: usize,
+    pub st_factor: f64,
+    pub highvol_pct: f64,
+    pub midvol_pct: f64,
+    pub lowvol_pct: f64,
+
+    // L4
+    pub ts_max_length: usize,
+    pub ts_accel_mult: f64,
+    pub ts_rma_len: usize,
+    pub ts_hma_len: usize,
+    pub ts_collen: usize,
+    pub ts_lookback: usize,
+    /// When `Some(t)`, a speed-exit fires if `|ts_speed| > t` against the position.
+    pub ts_speed_exit_threshold: Option<f64>,
+
+    // L9
+    pub wave_pct_l: f64,
+    pub wave_pct_s: f64,
+    pub mom_pct_min: f64,
+
+    // L10
+    pub hurst_lookback: usize,
+}
+
+impl Default for IndicatorConfig {
+    fn default() -> Self {
+        Self {
+            history_candles: 200,
+            training_period: 100,
+            ema_len: 9,
+            atr_len: 10,
+            st_factor: 3.0,
+            highvol_pct: 0.75,
+            midvol_pct: 0.50,
+            lowvol_pct: 0.25,
+            ts_max_length: 50,
+            ts_accel_mult: 5.0,
+            ts_rma_len: 10,
+            ts_hma_len: 5,
+            ts_collen: 100,
+            ts_lookback: 50,
+            ts_speed_exit_threshold: None,
+            wave_pct_l: 0.25,
+            wave_pct_s: 0.75,
+            mom_pct_min: 0.30,
+            hurst_lookback: 20,
+        }
+    }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
 #[inline]
 #[allow(dead_code)]
 fn ema_step(prev: Option<f64>, val: f64, len: usize) -> f64 {
@@ -98,7 +164,6 @@ fn hurst_scalar(closes: &[f64], max_lag: usize) -> f64 {
     if log_lags.len() < 3 {
         return 0.5;
     }
-    // Linear regression slope
     let n = log_lags.len() as f64;
     let mx = log_lags.iter().sum::<f64>() / n;
     let my = log_rs.iter().sum::<f64>() / n;
@@ -121,7 +186,7 @@ fn hurst_scalar(closes: &[f64], max_lag: usize) -> f64 {
 /// Call [`Indicators::update`] once per closed candle.
 /// After `training_period` candles, [`Indicators::st`] and related fields become `Some`.
 pub struct Indicators {
-    s: BotSettings,
+    cfg: IndicatorConfig,
     maxlen: usize,
 
     pub opens: VecDeque<f64>,
@@ -218,15 +283,18 @@ pub struct Indicators {
 }
 
 impl Indicators {
-    pub fn new(s: &BotSettings) -> Self {
-        let maxlen = s.history_candles.max(s.training_period + 50).max(300);
+    pub fn new(cfg: IndicatorConfig) -> Self {
+        let maxlen = cfg.history_candles.max(cfg.training_period + 50).max(300);
+        let ts_collen = cfg.ts_collen;
+        let ts_lookback = cfg.ts_lookback;
+
         let mut wr_tracker = PercentileTracker::new(200);
-        // seed tracker so first reads aren't degenerate
         for i in 0..100 {
             wr_tracker.push(if i % 2 == 0 { 0.5 } else { 2.0 });
         }
+
         Self {
-            s: s.clone(),
+            cfg,
             maxlen,
             opens: VecDeque::with_capacity(maxlen),
             highs: VecDeque::with_capacity(maxlen),
@@ -254,10 +322,10 @@ impl Indicators {
             rma_o: None,
             wave_speed: 0.0,
             wave_pos: 0,
-            speed_norm: VecDeque::with_capacity(s.ts_collen),
+            speed_norm: VecDeque::with_capacity(ts_collen),
             hma_buf: VecDeque::new(),
-            bull_waves: VecDeque::with_capacity(s.ts_lookback * 4),
-            bear_waves: VecDeque::with_capacity(s.ts_lookback * 4),
+            bull_waves: VecDeque::with_capacity(ts_lookback * 4),
+            bear_waves: VecDeque::with_capacity(ts_lookback * 4),
             wr_tracker,
             mom_tracker: PercentileTracker::seeded(200, 0.5, 0.5),
             cur_ratio: 0.0,
@@ -325,7 +393,7 @@ impl Indicators {
         let tr = (candle.high - candle.low)
             .max((candle.high - prev_c).abs())
             .max((candle.low - prev_c).abs());
-        self.rma_atr = Some(rma_step(self.rma_atr, tr, self.s.atr_len));
+        self.rma_atr = Some(rma_step(self.rma_atr, tr, self.cfg.atr_len));
         self.rma_atr.unwrap()
     }
 
@@ -351,12 +419,11 @@ impl Indicators {
     }
 
     fn compute_kmeans_centroids(&self) -> [f64; 3] {
-        let n = self.s.training_period.min(self.closes.len());
+        let n = self.cfg.training_period.min(self.closes.len());
         let ha: Vec<f64> = self.highs.iter().rev().take(n).copied().collect();
         let la: Vec<f64> = self.lows.iter().rev().take(n).copied().collect();
         let ca: Vec<f64> = self.closes.iter().rev().take(n).copied().collect();
 
-        // Build RMA ATR series
         let mut trs = vec![ha[0] - la[0]];
         for i in 1..n {
             trs.push(
@@ -365,7 +432,7 @@ impl Indicators {
                     .max((la[i] - ca[i - 1]).abs()),
             );
         }
-        let alpha = 1.0 / self.s.atr_len as f64;
+        let alpha = 1.0 / self.cfg.atr_len as f64;
         let mut atr_w = vec![trs[0]];
         for i in 1..trs.len() {
             atr_w.push(alpha * trs[i] + (1.0 - alpha) * atr_w[i - 1]);
@@ -379,9 +446,9 @@ impl Indicators {
             1e-9
         };
 
-        let mut c_h = lo + rng * self.s.highvol_pct;
-        let mut c_m = lo + rng * self.s.midvol_pct;
-        let mut c_l = lo + rng * self.s.lowvol_pct;
+        let mut c_h = lo + rng * self.cfg.highvol_pct;
+        let mut c_m = lo + rng * self.cfg.midvol_pct;
+        let mut c_l = lo + rng * self.cfg.lowvol_pct;
 
         for _ in 0..100 {
             let mut g: [Vec<f64>; 3] = [Vec::new(), Vec::new(), Vec::new()];
@@ -425,14 +492,13 @@ impl Indicators {
         let hl2 = (self.highs.back().copied().unwrap_or(close)
             + self.lows.back().copied().unwrap_or(close))
             / 2.0;
-        let factor = self.s.st_factor;
+        let factor = self.cfg.st_factor;
         let raw_upper = hl2 + factor * adaptive_atr;
         let raw_lower = hl2 - factor * adaptive_atr;
 
         let prev_u = self.st_upper.unwrap_or(raw_upper);
         let prev_l = self.st_lower.unwrap_or(raw_lower);
         let prev_st = self.st_value.unwrap_or(raw_upper);
-
         let prev_c = self.closes.iter().rev().nth(1).copied().unwrap_or(close);
 
         let lower = if raw_lower > prev_l || prev_c < prev_l {
@@ -465,9 +531,7 @@ impl Indicators {
     fn upd_trend_speed(&mut self, candle: &Candle) {
         let cl = candle.close;
         let op = candle.open;
-        let prev_c = self.prev_close.unwrap_or(cl);
 
-        // Dynamic EMA length based on candle body normalised by recent max
         let abs_cd = (cl - op).abs();
         if self.max_abs_buf.len() == 200 {
             self.max_abs_buf.pop_front();
@@ -480,8 +544,9 @@ impl Indicators {
             .fold(f64::NEG_INFINITY, f64::max)
             .max(1.0);
         let cd_norm = (abs_cd + max_abs) / (2.0 * max_abs);
-        let dyn_len = 5.0 + cd_norm * (self.s.ts_max_length as f64 - 5.0);
+        let dyn_len = 5.0 + cd_norm * (self.cfg.ts_max_length as f64 - 5.0);
 
+        let prev_c = self.prev_close.unwrap_or(cl);
         let delta = (cl - prev_c).abs();
         if self.delta_buf.len() == 200 {
             self.delta_buf.pop_front();
@@ -495,24 +560,25 @@ impl Indicators {
             .max(1.0);
         let accel = delta / max_d;
 
-        let alpha = (2.0 / (dyn_len + 1.0) * (1.0 + accel * self.s.ts_accel_mult)).min(1.0);
+        let alpha = (2.0 / (dyn_len + 1.0) * (1.0 + accel * self.cfg.ts_accel_mult)).min(1.0);
         self.dyn_ema = Some(match self.dyn_ema {
             None => cl,
             Some(prev) => alpha * cl + (1.0 - alpha) * prev,
         });
         self.dyn_ema_pub = self.dyn_ema;
 
-        self.rma_c = Some(rma_step(self.rma_c, cl, self.s.ts_rma_len));
-        self.rma_o = Some(rma_step(self.rma_o, op, self.s.ts_rma_len));
+        self.rma_c = Some(rma_step(self.rma_c, cl, self.cfg.ts_rma_len));
+        self.rma_o = Some(rma_step(self.rma_o, op, self.cfg.ts_rma_len));
 
         let trend = self.dyn_ema.unwrap();
         let prev_cl = self.closes.iter().rev().nth(1).copied().unwrap_or(cl);
         let c_rma = self.rma_c.unwrap_or(0.0);
         let o_rma = self.rma_o.unwrap_or(0.0);
+        let lookback_cap = self.cfg.ts_lookback * 4;
 
         if cl > trend && prev_cl <= trend {
             if self.wave_pos != 0 {
-                if self.bear_waves.len() == self.s.ts_lookback * 4 {
+                if self.bear_waves.len() == lookback_cap {
                     self.bear_waves.pop_front();
                 }
                 self.bear_waves.push_back(self.wave_speed);
@@ -521,7 +587,7 @@ impl Indicators {
             self.wave_speed = c_rma - o_rma;
         } else if cl < trend && prev_cl >= trend {
             if self.wave_pos != 0 {
-                if self.bull_waves.len() == self.s.ts_lookback * 4 {
+                if self.bull_waves.len() == lookback_cap {
                     self.bull_waves.pop_front();
                 }
                 self.bull_waves.push_back(self.wave_speed);
@@ -532,13 +598,12 @@ impl Indicators {
             self.wave_speed += c_rma - o_rma;
         }
 
-        if self.speed_norm.len() == self.s.ts_collen {
+        if self.speed_norm.len() == self.cfg.ts_collen {
             self.speed_norm.pop_front();
         }
         self.speed_norm.push_back(self.wave_speed);
 
-        // HMA of speed_norm
-        self.ts_speed = self.hma_smooth(self.s.ts_hma_len);
+        self.ts_speed = self.hma_smooth(self.cfg.ts_hma_len);
         self.ts_bullish = self.ts_speed > 0.0;
 
         let sp_min = self
@@ -558,7 +623,7 @@ impl Indicators {
         };
         self.ts_norm = (self.wave_speed - sp_min) / sp_rng;
 
-        let lb = self.s.ts_lookback;
+        let lb = self.cfg.ts_lookback;
         let bull_r: Vec<f64> = self.bull_waves.iter().rev().take(lb).copied().collect();
         let bear_r: Vec<f64> = self.bear_waves.iter().rev().take(lb).copied().collect();
         self.bull_avg = if bull_r.is_empty() {
@@ -574,7 +639,6 @@ impl Indicators {
         self.dominance = self.bull_avg - self.bear_avg.abs();
         self.prev_close = Some(cl);
 
-        // Wave ratio percentile
         let bear_abs = self.bear_avg.abs().max(1e-9);
         let wave_ratio = if self.bull_avg > 0.0 {
             self.bull_avg / bear_abs
@@ -584,7 +648,6 @@ impl Indicators {
         self.wr_tracker.push(wave_ratio);
         self.wr_pct = self.wr_tracker.pct(wave_ratio);
 
-        // Momentum percentile
         self.cur_ratio = if self.wave_speed > 0.0 && self.bull_avg > 0.0 {
             self.wave_speed / self.bull_avg
         } else if self.wave_speed < 0.0 && bear_abs > 0.0 {
@@ -595,9 +658,9 @@ impl Indicators {
         self.mom_tracker.push(self.cur_ratio.abs());
         self.mom_pct = self.mom_tracker.pct(self.cur_ratio.abs());
 
-        let wl = self.s.wave_pct_l.clamp(0.01, 0.99);
-        let ws = (1.0 - self.s.wave_pct_s).clamp(0.01, 0.99);
-        let ml = self.s.mom_pct_min.clamp(0.01, 0.99);
+        let wl = self.cfg.wave_pct_l.clamp(0.01, 0.99);
+        let ws = (1.0 - self.cfg.wave_pct_s).clamp(0.01, 0.99);
+        let ml = self.cfg.mom_pct_min.clamp(0.01, 0.99);
 
         self.wave_ok_long = self.wr_pct >= wl;
         self.wave_ok_short = self.wr_pct <= ws;
@@ -623,7 +686,7 @@ impl Indicators {
         wma(&hma_arr)
     }
 
-    // ── L9 Awesome Oscillator ────────────────────────────────────────────────
+    // ── L9 Awesome Oscillator ─────────────────────────────────────────────────
 
     fn upd_ao(&mut self) {
         if self.highs.len() < 34 {
@@ -646,7 +709,7 @@ impl Indicators {
     // ── L10 Hurst ─────────────────────────────────────────────────────────────
 
     fn upd_hurst(&mut self) {
-        let lb = self.s.hurst_lookback;
+        let lb = self.cfg.hurst_lookback;
         let min_bars = lb * 2 + 1;
         if self.closes.len() < min_bars || (self.bar - self.hurst_last_bar) < 10 {
             return;
@@ -706,7 +769,7 @@ impl Indicators {
 
         self.vwap = Some(self.upd_vwap(candle));
 
-        let k = 2.0 / (self.s.ema_len as f64 + 1.0);
+        let k = 2.0 / (self.cfg.ema_len as f64 + 1.0);
         self.ema9 = Some(match self.ema9 {
             None => candle.close,
             Some(e) => candle.close * k + e * (1.0 - k),
@@ -721,7 +784,7 @@ impl Indicators {
         self.upd_hurst();
         self.upd_accel();
 
-        if self.closes.len() < self.s.training_period {
+        if self.closes.len() < self.cfg.training_period {
             return false;
         }
 
@@ -734,9 +797,11 @@ impl Indicators {
     }
 
     /// Returns `true` if a speed-exit condition is triggered for the given position.
-    /// `position`: +1 = long, -1 = short.
+    ///
+    /// `position`: `+1` = long, `-1` = short.
+    /// Returns `false` when `ts_speed_exit_threshold` is `None`.
     pub fn check_speed_exit(&self, position: i32) -> bool {
-        let Some(thr) = self.s.ts_speed_exit_threshold else {
+        let Some(thr) = self.cfg.ts_speed_exit_threshold else {
             return false;
         };
         if position > 0 && self.ts_speed < -thr.abs() {
