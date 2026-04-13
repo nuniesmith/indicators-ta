@@ -98,7 +98,9 @@ impl Indicator for EngineIndicator {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let training_period = param_usize(params, "training_period", 100)?;
     let ema_len = param_usize(params, "ema_len", 9)?;
     let atr_len = param_usize(params, "atr_len", 10)?;
@@ -255,6 +257,8 @@ pub struct Indicators {
 
     // L10 Hurst
     hurst_last_bar: usize,
+    /// Close price at the last Hurst recompute — used to skip redundant R/S runs.
+    hurst_last_close: f64,
 
     // L11 Price acceleration
     vel_buf: VecDeque<f64>,
@@ -352,6 +356,7 @@ impl Indicators {
             mom_tracker: PercentileTracker::seeded(200, 0.5, 0.5),
             cur_ratio: 0.0,
             hurst_last_bar: 0,
+            hurst_last_close: f64::NAN,
             vel_buf: VecDeque::with_capacity(110),
             vwap: None,
             ema: None,
@@ -736,9 +741,24 @@ impl Indicators {
         if self.closes.len() < min_bars || (self.bar - self.hurst_last_bar) < 10 {
             return;
         }
+        // Skip the O(N log N) R/S loop when the close has barely moved since
+        // the last recompute (< 0.01 % change).  The Hurst exponent is stable
+        // over such tiny price moves, so the cached value remains valid.
+        let cur_close = *self.closes.back().unwrap_or(&0.0);
+        let pct_move = if self.hurst_last_close.is_nan() || self.hurst_last_close.abs() < 1e-10 {
+            f64::INFINITY // force first compute
+        } else {
+            (cur_close - self.hurst_last_close).abs() / self.hurst_last_close
+        };
+        if pct_move < 1e-4 {
+            // Price hasn't moved enough to shift the Hurst estimate — reuse cache.
+            self.hurst_last_bar = self.bar;
+            return;
+        }
         let cl_arr: Vec<f64> = self.closes.iter().rev().take(min_bars).copied().collect();
         self.hurst = hurst_scalar(&cl_arr, lb);
         self.hurst_last_bar = self.bar;
+        self.hurst_last_close = cur_close;
     }
 
     // ── L11 Price acceleration ────────────────────────────────────────────────
