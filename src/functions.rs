@@ -35,6 +35,44 @@ pub fn ema(prices: &[f64], period: usize) -> Result<Vec<f64>, IndicatorError> {
     Ok(result)
 }
 
+/// EMA that handles leading NaN values, matching Python's `ewm(adjust=False)` behaviour.
+///
+/// Unlike [`ema`], which seeds from the arithmetic mean of the first `period`
+/// values, this function seeds from the **first non-NaN value** and applies
+/// the recursive formula from that point on.  All positions before the first
+/// non-NaN value are left as `NaN`.
+///
+/// This is needed wherever EMA is applied to a derived series (e.g. the MACD
+/// line) that already has a leading NaN warm-up period.  Using the standard
+/// [`ema`] on such a series would propagate NaN through the SMA seed and
+/// produce an all-NaN output.
+pub fn ema_nan_aware(prices: &[f64], period: usize) -> Result<Vec<f64>, IndicatorError> {
+    if period == 0 {
+        return Err(IndicatorError::InvalidParameter {
+            name: "period".into(),
+            value: 0.0,
+        });
+    }
+    let mut result = vec![f64::NAN; prices.len()];
+    let alpha = 2.0 / (period as f64 + 1.0);
+
+    // Seed from the first non-NaN value (adjust=False, no SMA warm-up).
+    let start = match prices.iter().position(|v| !v.is_nan()) {
+        Some(i) => i,
+        None => return Ok(result), // all NaN — nothing to compute
+    };
+
+    result[start] = prices[start];
+    for i in (start + 1)..prices.len() {
+        result[i] = if prices[i].is_nan() {
+            f64::NAN
+        } else {
+            prices[i] * alpha + result[i - 1] * (1.0 - alpha)
+        };
+    }
+    Ok(result)
+}
+
 /// Simple Moving Average over a price slice.
 pub fn sma(prices: &[f64], period: usize) -> Result<Vec<f64>, IndicatorError> {
     if period == 0 {
@@ -128,15 +166,20 @@ pub fn macd(
     slow_period: usize,
     signal_period: usize,
 ) -> MacdResult {
-    let fast_ema = ema(prices, fast_period)?;
-    let slow_ema = ema(prices, slow_period)?;
+    // Use ema_nan_aware to match Python's ewm(span=X, adjust=False), which
+    // seeds from the first value rather than an SMA of the first `period` bars.
+    let fast_ema = ema_nan_aware(prices, fast_period)?;
+    let slow_ema = ema_nan_aware(prices, slow_period)?;
     let mut macd_line = vec![f64::NAN; prices.len()];
     for i in 0..prices.len() {
         if !fast_ema[i].is_nan() && !slow_ema[i].is_nan() {
             macd_line[i] = fast_ema[i] - slow_ema[i];
         }
     }
-    let signal_line = ema(&macd_line, signal_period)?;
+    // The macd_line has leading NaN (warm-up from the slow EMA); use the
+    // NaN-aware variant so the signal seeds from the first valid MACD value
+    // rather than an all-NaN SMA, matching Python's ewm(adjust=False).
+    let signal_line = ema_nan_aware(&macd_line, signal_period)?;
     let mut histogram = vec![f64::NAN; prices.len()];
     for i in 0..prices.len() {
         if !macd_line[i].is_nan() && !signal_line[i].is_nan() {

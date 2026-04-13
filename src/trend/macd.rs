@@ -72,8 +72,10 @@ impl Indicator for Macd {
     }
 
     fn required_len(&self) -> usize {
-        // need enough bars for the slow EMA to warm up plus signal line
-        self.params.slow_period + self.params.signal_period
+        // Only need enough bars for the slow EMA to produce at least one value.
+        // The signal line uses ema_nan_aware, which seeds from the first valid
+        // MACD value, so it doesn't add to the minimum requirement.
+        self.params.slow_period
     }
 
     fn required_columns(&self) -> &[&'static str] {

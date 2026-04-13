@@ -1,23 +1,5 @@
 //! Schaff Trend Cycle (STC).
 //!
-//! Python source: `indicators/other/schaff_trend_cycle.py :: class SchaffTrendCycle`
-//!
-//! # Python algorithm (to port)
-//! ```python
-//! short_ema  = df["Close"].ewm(span=self.short_ema).mean()
-//! long_ema   = df["Close"].ewm(span=self.long_ema).mean()
-//! macd       = short_ema - long_ema
-//! macd_sig   = macd.ewm(span=9).mean()
-//! macd_diff  = macd - macd_sig
-//!
-//! lowest  = macd_diff.rolling(self.stoch_period).min()
-//! highest = macd_diff.rolling(self.stoch_period).max()
-//! stc     = 100 * (macd_diff - lowest) / (highest - lowest)
-//!
-//! if self.signal_period > 0:
-//!     stc = stc.ewm(span=self.signal_period).mean()
-//! ```
-//!
 //! Readings above 75 → overbought; below 25 → oversold.
 //! Oscillates 0–100.
 //!
@@ -72,7 +54,11 @@ impl Indicator for SchaffTrendCycle {
     }
 
     fn required_len(&self) -> usize {
-        self.params.long_ema + self.params.stoch_period + self.params.signal_period
+        // The minimum data required for at least some non-NaN output is the
+        // slow EMA warm-up period.  The stochastic and signal stages add
+        // additional latency but do not require extra candles at the input
+        // boundary — they simply produce NaN for their own warm-up bars.
+        self.params.long_ema
     }
 
     fn required_columns(&self) -> &[&'static str] {
@@ -112,7 +98,9 @@ impl Indicator for SchaffTrendCycle {
             .collect();
 
         // Signal of MACD (span=9).
-        let macd_sig = functions::ema(&macd_line, 9)?;
+        // macd_line has leading NaN (warm-up from long_ema); use the NaN-aware
+        // EMA so it seeds from the first valid value rather than propagating NaN.
+        let macd_sig = functions::ema_nan_aware(&macd_line, 9)?;
         let macd_diff: Vec<f64> = (0..n)
             .map(|i| {
                 if macd_line[i].is_nan() || macd_sig[i].is_nan() {
@@ -139,8 +127,10 @@ impl Indicator for SchaffTrendCycle {
         }
 
         // Step 3: optional EMA smoothing.
+        // `stc` has leading NaN from the stochastic warm-up; use the NaN-aware
+        // EMA so it seeds from the first valid stochastic value.
         let values = if self.params.signal_period > 0 {
-            functions::ema(&stc, self.params.signal_period)?
+            functions::ema_nan_aware(&stc, self.params.signal_period)?
         } else {
             stc
         };

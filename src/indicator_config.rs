@@ -2,22 +2,7 @@
 //!
 //! Pure configuration: no I/O, no runtime, no exchange types.
 //! This struct is what `compute_signal` and all indicator constructors need.
-//! `kucoin-futures` embeds this inside `BotSettings` and passes it through.
 //!
-//! # Usage (kucoin-futures side)
-//! ```rust,ignore
-//! use indicators::IndicatorConfig;
-//! use serde::{Deserialize, Serialize};
-//!
-//! #[derive(Serialize, Deserialize)]
-//! pub struct BotSettings {
-//!     pub symbol: String,
-//!     pub leverage: u32,
-//!     // ...runtime fields...
-//!     #[serde(flatten)]
-//!     pub indicator: IndicatorConfig,
-//! }
-//! ```
 
 use serde::{Deserialize, Serialize};
 

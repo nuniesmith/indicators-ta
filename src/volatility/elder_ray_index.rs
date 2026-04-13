@@ -73,7 +73,10 @@ impl Indicator for ElderRayIndex {
         let high: Vec<f64> = candles.iter().map(|c| c.high).collect();
         let low: Vec<f64> = candles.iter().map(|c| c.low).collect();
 
-        let ema = functions::ema(&close, self.params.fast_period)?;
+        // Use ema_nan_aware to match Python's ewm(span=period, adjust=False),
+        // which seeds from the first close value rather than an SMA over the
+        // first `period` bars.  This aligns with the Python docstring above.
+        let ema = functions::ema_nan_aware(&close, self.params.fast_period)?;
 
         let bull: Vec<f64> = high.iter().zip(&ema).map(|(&h, &e)| h - e).collect();
         let bear: Vec<f64> = low.iter().zip(&ema).map(|(&l, &e)| l - e).collect();

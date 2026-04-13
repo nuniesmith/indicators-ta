@@ -1,6 +1,6 @@
 //! Signal aggregator — combines all 11 indicator layers into a single trading signal.
 //!
-//! Moved from `kucoin-futures` — pure math, no exchange I/O.
+//! pure math, no exchange I/O.
 //!
 //! # Usage
 //! ```rust,ignore

@@ -109,7 +109,9 @@ impl Indicator for Atr {
         let tr = functions::true_range(&high, &low, &close)?;
 
         let atr_vals = match self.params.method {
-            AtrMethod::Ema => functions::ema(&tr, self.params.period)?,
+            // ema_nan_aware seeds from the first TR value (adjust=False),
+            // matching Python's tr.ewm(span=period, adjust=False).mean().
+            AtrMethod::Ema => functions::ema_nan_aware(&tr, self.params.period)?,
             AtrMethod::Sma => functions::sma(&tr, self.params.period)?,
         };
 
