@@ -9,11 +9,7 @@
 /// - Random numeric and non-numeric param values don't crash the factories
 use std::collections::HashMap;
 
-use indicators::{
-    error::IndicatorError,
-    registry::registry,
-    types::Candle,
-};
+use indicators::{error::IndicatorError, registry::registry, types::Candle};
 
 // ── Candle helpers ────────────────────────────────────────────────────────────
 
@@ -39,7 +35,10 @@ fn rising_candles(n: usize) -> Vec<Candle> {
 #[test]
 fn registry_is_non_empty() {
     let names = registry().list();
-    assert!(!names.is_empty(), "registry must have at least one registered indicator");
+    assert!(
+        !names.is_empty(),
+        "registry must have at least one registered indicator"
+    );
 }
 
 #[test]
@@ -47,11 +46,20 @@ fn registry_contains_core_indicators() {
     // Spot-check a representative set — any rename will surface here.
     let reg = registry();
     for name in &[
-        "sma", "ema", "wma", "macd", "atr",
-        "rsi", "stochastic", "williamsr",
-        "bollingerbands", "keltnerchannels",
-        "vwap", "adl",
-        "engine", "signal",
+        "sma",
+        "ema",
+        "wma",
+        "macd",
+        "atr",
+        "rsi",
+        "stochastic",
+        "williamsr",
+        "bollingerbands",
+        "keltnerchannels",
+        "vwap",
+        "adl",
+        "engine",
+        "signal",
     ] {
         assert!(
             reg.contains(name),
@@ -231,8 +239,9 @@ fn empty_string_period_returns_invalid_parameter_error() {
 #[test]
 fn float_period_string_returns_error() {
     // e.g. "14.5" is not a valid usize.
-    let bad_params: HashMap<String, String> =
-        [("period".to_string(), "14.5".to_string())].into_iter().collect();
+    let bad_params: HashMap<String, String> = [("period".to_string(), "14.5".to_string())]
+        .into_iter()
+        .collect();
 
     for name in &["sma", "ema", "rsi"] {
         let result = registry().create(name, &bad_params);
@@ -273,8 +282,9 @@ fn random_string_params_do_not_panic() {
 
     for name in &names {
         for val in &garbage_values {
-            let params: HashMap<String, String> =
-                [("period".to_string(), val.to_string())].into_iter().collect();
+            let params: HashMap<String, String> = [("period".to_string(), val.to_string())]
+                .into_iter()
+                .collect();
             // The call must never panic — errors are expected and fine.
             let result = std::panic::catch_unwind(|| {
                 let _ = registry().create(name, &params);
@@ -313,8 +323,9 @@ fn unknown_param_keys_are_ignored() {
 /// Period values of 1 should be accepted (degenerate but valid).
 #[test]
 fn period_of_one_is_accepted() {
-    let params: HashMap<String, String> =
-        [("period".to_string(), "1".to_string())].into_iter().collect();
+    let params: HashMap<String, String> = [("period".to_string(), "1".to_string())]
+        .into_iter()
+        .collect();
 
     let reg = registry();
     for name in &["sma", "ema", "wma", "rsi"] {
@@ -329,15 +340,19 @@ fn period_of_one_is_accepted() {
 /// Very large but valid period strings should either succeed or fail gracefully.
 #[test]
 fn large_period_does_not_panic() {
-    let params: HashMap<String, String> =
-        [("period".to_string(), "10000".to_string())].into_iter().collect();
+    let params: HashMap<String, String> = [("period".to_string(), "10000".to_string())]
+        .into_iter()
+        .collect();
 
     let reg = registry();
     for name in reg.list().iter() {
         let result = std::panic::catch_unwind(|| {
             let _ = registry().create(name, &params);
         });
-        assert!(result.is_ok(), "indicator '{name}' panicked with period=10000");
+        assert!(
+            result.is_ok(),
+            "indicator '{name}' panicked with period=10000"
+        );
     }
 }
 

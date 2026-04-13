@@ -57,9 +57,8 @@ pub fn ema_nan_aware(prices: &[f64], period: usize) -> Result<Vec<f64>, Indicato
     let alpha = 2.0 / (period as f64 + 1.0);
 
     // Seed from the first non-NaN value (adjust=False, no SMA warm-up).
-    let start = match prices.iter().position(|v| !v.is_nan()) {
-        Some(i) => i,
-        None => return Ok(result), // all NaN — nothing to compute
+    let Some(start) = prices.iter().position(|v| !v.is_nan()) else {
+        return Ok(result); // all NaN — nothing to compute
     };
 
     result[start] = prices[start];

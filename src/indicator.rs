@@ -1,249 +1,202 @@
-//! Core `Indicator` trait and `IndicatorOutput` type.
-//!
-//! Mirrors `indicators/base.py`:
-//! - `Indicator` ↔ `class Indicator(Component, ABC)`
-//! - `IndicatorOutput` ↔ `pd.DataFrame` return value
-//! - `required_columns()` ↔ `@classmethod required_columns()`
-//! - `calculate()` ↔ `def calculate(self, data, price_column)`
-//!
-//! Every indicator in `trend/`, `momentum/`, `volume/`, and `other/`
-//! must implement this trait.  The registry (`registry.rs`) stores
-//! `Box<dyn Indicator>` values so they can be created by name at
-//! runtime, matching Python's `@register_indicator` / `IndicatorRegistry`.
-
-use indexmap::IndexMap;
-
-use crate::error::IndicatorError;
-use crate::types::Candle;
-
-// ── IndicatorOutput ───────────────────────────────────────────────────────────
-
-/// Named column output, analogous to `pd.DataFrame` returned by Python `calculate()`.
+/// Criterion benchmarks for the indicators hot path.
 ///
-/// Keys are column names such as `"SMA_20"`, `"MACD_line"`, `"ATR_14"`.
-/// Values are aligned `Vec<f64>` of the same length as the input slice.
-/// Leading warm-up entries are `f64::NAN`.
+/// Three groups:
 ///
-/// Columns are stored in an [`IndexMap`] so iteration order matches insertion
-/// order — the order indicators push their columns in `from_pairs` / `insert`.
-/// This makes display, serialisation, and tests deterministic without sorting.
-#[derive(Debug, Clone, Default)]
-pub struct IndicatorOutput {
-    columns: IndexMap<String, Vec<f64>>,
+/// 1. `engine_update` — full `Indicators::update()` replay at different dataset
+///    sizes.  At every 10th bar past `training_period` (100) the engine runs
+///    KMeans (O(N × K × 100 iters)).  At every 10th bar past bar 41 it also
+///    re-runs `hurst_scalar` (O(N log N)).  These benchmarks make both costs
+///    visible and provide a baseline for future optimisations.
+///
+/// 2. `engine_hot_bar` — a single `update()` call at bar 150, where both
+///    KMeans and Hurst fire simultaneously.  `iter_batched` excludes the
+///    warm-up cost from the measurement so the number reflects only the hot-
+///    path work.
+///
+/// 3. `signal_pipeline` — full `SignalIndicator::calculate()` end-to-end for
+///    different candle-slice sizes.  This is the realistic production cost.
+use criterion::{BatchSize, BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+
+use indicators::{
+    IndicatorConfig, IndicatorConfig as Cfg, Indicators, SignalIndicator, compute_signal,
+    indicator::Indicator,
+    signal::{
+        confluence::ConfluenceEngine, cvd::CVDTracker, liquidity::LiquidityProfile,
+        structure::MarketStructure, vol_regime::VolatilityPercentile,
+    },
+    types::Candle,
+};
+
+// ── Candle generation ─────────────────────────────────────────────────────────
+
+/// Build `n` rising candles with realistic OHLCV variation.
+fn rising_candles(n: usize) -> Vec<Candle> {
+    (0..n)
+        .map(|i| {
+            // Small oscillation on top of the trend keeps KMeans meaningful.
+            let wave = (i as f64 * 0.3).sin() * 0.5;
+            let c = 100.0 + i as f64 * 0.25 + wave;
+            Candle {
+                time: i as i64 * 60_000,
+                open: c - 0.15,
+                high: c + 0.35,
+                low: c - 0.35,
+                close: c,
+                volume: 800.0 + ((i * 37) % 400) as f64,
+            }
+        })
+        .collect()
 }
 
-impl IndicatorOutput {
-    /// Create an empty output.
-    pub fn new() -> Self {
-        Self::default()
+// ── Group 1: engine_update replay ────────────────────────────────────────────
+
+fn bench_engine_update(c: &mut Criterion) {
+    let mut group = c.benchmark_group("engine_update");
+
+    for &n_bars in &[100usize, 200, 500] {
+        let candles = rising_candles(n_bars);
+        group.bench_with_input(BenchmarkId::from_parameter(n_bars), &candles, |b, cs| {
+            b.iter(|| {
+                let mut ind = Indicators::new(Cfg::default());
+                for candle in cs {
+                    black_box(ind.update(black_box(candle)));
+                }
+            });
+        });
     }
 
-    /// Insert a named column.
-    pub fn insert(&mut self, name: impl Into<String>, values: Vec<f64>) {
-        self.columns.insert(name.into(), values);
-    }
-
-    /// Build from an iterator of `(name, values)` pairs.
-    pub fn from_pairs<K: Into<String>>(pairs: impl IntoIterator<Item = (K, Vec<f64>)>) -> Self {
-        let mut out = Self::new();
-        for (k, v) in pairs {
-            out.insert(k, v);
-        }
-        out
-    }
-
-    /// Get the values for a named column.
-    pub fn get(&self, name: &str) -> Option<&[f64]> {
-        self.columns.get(name).map(Vec::as_slice)
-    }
-
-    /// Get the *last* (most recent) value of a named column, skipping `NaN`.
-    ///
-    /// Mirrors Python's `indicator.get_value(-1)`.
-    pub fn latest(&self, name: &str) -> Option<f64> {
-        self.columns
-            .get(name)?
-            .iter()
-            .rev()
-            .find(|v| !v.is_nan())
-            .copied()
-    }
-
-    /// All column names present in this output.
-    pub fn columns(&self) -> impl Iterator<Item = &str> {
-        self.columns.keys().map(String::as_str)
-    }
-
-    /// Number of rows (length of any column; all columns are guaranteed equal length).
-    pub fn len(&self) -> usize {
-        self.columns.values().next().map_or(0, Vec::len)
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Consume into the underlying map.
-    pub fn into_inner(self) -> IndexMap<String, Vec<f64>> {
-        self.columns
-    }
+    group.finish();
 }
 
-// ── Indicator trait ───────────────────────────────────────────────────────────
+// ── Group 2: single hot-bar update ───────────────────────────────────────────
+//
+// Bar 150 triggers KMeans (bars 100, 110, 120, 130, 140, 150) and Hurst
+// (bars 41, 51, …, 141, 151 — so bar 150 also triggers Hurst at bar 150).
+// `iter_batched` moves the warm-up into the setup phase so only the single
+// `update()` call is timed.
 
-/// The core trait every indicator must implement.
-///
-/// Analogous to `indicators/base.py :: class Indicator(ABC)`.
-///
-/// # Implementing an indicator
-///
-/// ```rust,ignore
-/// use crate::indicator::{Indicator, IndicatorOutput};
-/// use crate::error::IndicatorError;
-/// use crate::types::Candle;
-///
-/// pub struct Sma {
-///     pub period: usize,
-///     pub column: PriceColumn,
-/// }
-///
-/// impl Indicator for Sma {
-///     fn name(&self) -> &str { "SMA" }
-///
-///     fn required_len(&self) -> usize { self.period }
-///
-///     fn required_columns(&self) -> &[&str] { &["close"] }
-///
-///     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
-///     }
-/// }
-/// ```
-pub trait Indicator: Send + Sync + std::fmt::Debug {
-    /// Short canonical name, e.g. `"SMA"`, `"RSI"`, `"MACD"`.
-    fn name(&self) -> &'static str;
+fn bench_engine_hot_bar(c: &mut Criterion) {
+    // Bar index for the measurement — chosen to coincide with a KMeans + Hurst
+    // double-trigger: bar 150 satisfies (150 - 100) % 10 == 0 for KMeans and
+    // (150 - 140) >= 10 for Hurst.
+    let warmup_n: usize = 150;
+    let warmup_candles = rising_candles(warmup_n);
 
-    /// Minimum number of candles required before output is non-`NaN`.
-    /// Mirrors Python's implicit warm-up period used for validation.
-    fn required_len(&self) -> usize;
+    // The candle that will actually be measured.
+    let measure_candle = rising_candles(warmup_n + 1).into_iter().last().unwrap();
 
-    /// Which OHLCV fields this indicator reads.
-    ///
-    /// Mirrors `@classmethod required_columns()` in Python.
-    /// Valid values: `"open"`, `"high"`, `"low"`, `"close"`, `"volume"`.
-    fn required_columns(&self) -> &[&'static str];
-
-    /// Compute the indicator over a full candle slice (batch mode).
-    ///
-    /// Mirrors `def calculate(self, data: pd.DataFrame, price_column) -> pd.DataFrame`.
-    ///
-    /// - Returns `IndicatorOutput` with one or more named columns.
-    /// - Leading warm-up rows should be `f64::NAN`.
-    /// - Returns `Err(IndicatorError::InsufficientData)` if `candles.len() < required_len()`.
-    fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError>;
-
-    /// Validate that enough data was supplied, returning a descriptive error if not.
-    ///
-    /// Call this at the top of every `calculate()` implementation.
-    fn check_len(&self, candles: &[Candle]) -> Result<(), IndicatorError> {
-        let required = self.required_len();
-        if candles.len() < required {
-            Err(IndicatorError::InsufficientData {
-                required,
-                available: candles.len(),
-            })
-        } else {
-            Ok(())
-        }
-    }
-}
-
-// ── PriceColumn helper ────────────────────────────────────────────────────────
-
-/// Which single OHLCV field to extract as a price series.
-///
-/// Mirrors the `column` / `price_column` parameter in Python indicators.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum PriceColumn {
-    Open,
-    High,
-    Low,
-    #[default]
-    Close,
-    Volume,
-    /// `(High + Low + Close) / 3`
-    TypicalPrice,
-    /// `(High + Low) / 2`
-    HL2,
-}
-
-impl PriceColumn {
-    /// Extract the column as a `Vec<f64>` from a candle slice.
-    pub fn extract(self, candles: &[Candle]) -> Vec<f64> {
-        candles
-            .iter()
-            .map(|c| match self {
-                PriceColumn::Open => c.open,
-                PriceColumn::High => c.high,
-                PriceColumn::Low => c.low,
-                PriceColumn::Close => c.close,
-                PriceColumn::Volume => c.volume,
-                PriceColumn::TypicalPrice => (c.high + c.low + c.close) / 3.0,
-                PriceColumn::HL2 => (c.high + c.low) / 2.0,
-            })
-            .collect()
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            PriceColumn::Open => "open",
-            PriceColumn::High => "high",
-            PriceColumn::Low => "low",
-            PriceColumn::Close => "close",
-            PriceColumn::Volume => "volume",
-            PriceColumn::TypicalPrice => "typical_price",
-            PriceColumn::HL2 => "hl2",
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn indicator_output_insert_and_get() {
-        let mut out = IndicatorOutput::new();
-        out.insert("SMA_20", vec![f64::NAN, f64::NAN, 10.0, 12.0]);
-        assert_eq!(out.len(), 4);
-        assert_eq!(out.latest("SMA_20"), Some(12.0));
-        assert!(out.get("MISSING").is_none());
-    }
-
-    #[test]
-    fn indicator_output_from_pairs() {
-        let out = IndicatorOutput::from_pairs([
-            ("MACD_line", vec![1.0, 2.0]),
-            ("MACD_signal", vec![0.5, 1.5]),
-        ]);
-        assert!(out.get("MACD_line").is_some());
-        assert!(out.get("MACD_signal").is_some());
-    }
-
-    #[test]
-    fn price_column_extract() {
-        let candle = Candle {
-            time: 0,
-            open: 1.0,
-            high: 4.0,
-            low: 2.0,
-            close: 3.0,
-            volume: 100.0,
-        };
-        let candles = vec![candle];
-        assert_eq!(PriceColumn::Close.extract(&candles), vec![3.0]);
-        assert_eq!(
-            PriceColumn::TypicalPrice.extract(&candles),
-            vec![(4.0 + 2.0 + 3.0) / 3.0]
+    c.bench_function("engine_hot_bar_150_kmeans_plus_hurst", |b| {
+        b.iter_batched(
+            || {
+                // Setup (excluded from timing): replay warmup_n bars.
+                let mut ind = Indicators::new(Cfg::default());
+                for c in &warmup_candles {
+                    ind.update(c);
+                }
+                ind
+            },
+            |mut ind| {
+                // Measured: one update on a post-training bar where both
+                // KMeans and Hurst recompute.
+                black_box(ind.update(black_box(&measure_candle)))
+            },
+            BatchSize::SmallInput,
         );
-    }
+    });
 }
+
+/// Isolate a bar that does NOT trigger KMeans or Hurst (bar 155 — 5 bars after
+/// the last trigger at 150) so we can see the baseline cost of a "normal" bar.
+fn bench_engine_normal_bar(c: &mut Criterion) {
+    let warmup_n: usize = 155;
+    let warmup_candles = rising_candles(warmup_n);
+    let measure_candle = rising_candles(warmup_n + 1).into_iter().last().unwrap();
+
+    c.bench_function("engine_normal_bar_155_no_recompute", |b| {
+        b.iter_batched(
+            || {
+                let mut ind = Indicators::new(Cfg::default());
+                for c in &warmup_candles {
+                    ind.update(c);
+                }
+                ind
+            },
+            |mut ind| black_box(ind.update(black_box(&measure_candle))),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+// ── Group 3: full signal pipeline ────────────────────────────────────────────
+
+fn bench_signal_pipeline(c: &mut Criterion) {
+    let mut group = c.benchmark_group("signal_pipeline");
+
+    for &n_bars in &[150usize, 300] {
+        let candles = rising_candles(n_bars);
+        let si = SignalIndicator::with_defaults();
+
+        group.bench_with_input(BenchmarkId::from_parameter(n_bars), &candles, |b, cs| {
+            b.iter(|| black_box(si.calculate(black_box(cs)).unwrap()));
+        });
+    }
+
+    group.finish();
+}
+
+// ── Group 4: per-bar streaming pipeline (realistic loop) ─────────────────────
+//
+// Mirrors production usage: all sub-components updated one candle at a time,
+// followed by `compute_signal`.  This reveals the true per-bar latency in a
+// live trading loop.
+
+fn bench_streaming_per_bar(c: &mut Criterion) {
+    let candles = rising_candles(300);
+    let cfg = IndicatorConfig::default();
+
+    c.bench_function("streaming_per_bar_300_bars", |b| {
+        b.iter(|| {
+            let mut ind = Indicators::new(cfg.clone());
+            let mut liq = LiquidityProfile::new(50, 20);
+            let mut conf = ConfluenceEngine::new(8, 21, 50, 14, 14);
+            let mut ms = MarketStructure::new(5, 0.5);
+            let mut cvd = CVDTracker::new(10, 20);
+            let mut vol = VolatilityPercentile::new(100);
+
+            for c in &candles {
+                ind.update(c);
+                liq.update(c);
+                conf.update(c);
+                ms.update(c);
+                cvd.update(c);
+                vol.update(ind.atr);
+
+                black_box(compute_signal(
+                    c.close,
+                    &ind,
+                    &liq,
+                    &conf,
+                    &ms,
+                    &cfg,
+                    Some(&cvd),
+                    Some(&vol),
+                ));
+            }
+        });
+    });
+}
+
+// ── Criterion wiring ──────────────────────────────────────────────────────────
+
+criterion_group!(
+    engine_benches,
+    bench_engine_update,
+    bench_engine_hot_bar,
+    bench_engine_normal_bar,
+);
+criterion_group!(
+    pipeline_benches,
+    bench_signal_pipeline,
+    bench_streaming_per_bar
+);
+criterion_main!(engine_benches, pipeline_benches);

@@ -172,7 +172,11 @@ pub fn param_f64<S: ::std::hash::BuildHasher>(
 }
 
 /// Parse a `String` param with a default fallback.
-pub fn param_str<'a, S: ::std::hash::BuildHasher>(params: &'a HashMap<String, String, S>, key: &str, default: &'a str) -> &'a str {
+pub fn param_str<'a, S: ::std::hash::BuildHasher>(
+    params: &'a HashMap<String, String, S>,
+    key: &str,
+    default: &'a str,
+) -> &'a str {
     params.get(key).map_or(default, String::as_str)
 }
 

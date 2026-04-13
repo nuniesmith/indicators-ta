@@ -8,13 +8,9 @@
 mod common;
 
 use indicators::{
-    indicator::Indicator,
-    signal::cvd::CVDTracker,
-    signal::vol_regime::VolatilityPercentile,
     ConfluenceEngine, IndicatorConfig, Indicators, LiquidityProfile, MarketStructure,
-    SignalIndicator, SignalStreak,
-    compute_signal,
-    types::Candle,
+    SignalIndicator, SignalStreak, compute_signal, indicator::Indicator, signal::cvd::CVDTracker,
+    signal::vol_regime::VolatilityPercentile, types::Candle,
 };
 
 const EPS: f64 = 1e-9;
@@ -147,7 +143,10 @@ fn bull_bear_scores_are_non_negative() {
     for col in &["signal_bull_score", "signal_bear_score"] {
         for (i, &v) in out.get(col).unwrap().iter().enumerate() {
             if !v.is_nan() {
-                assert!(v >= 0.0, "{col}[{i}] = {v} is negative — scores must be ≥ 0");
+                assert!(
+                    v >= 0.0,
+                    "{col}[{i}] = {v} is negative — scores must be ≥ 0"
+                );
             }
         }
     }
@@ -192,8 +191,16 @@ fn compute_signal_returns_zero_before_engine_ready() {
     ms.update(&c);
     cvd.update(&c);
 
-    let (raw, _comps) =
-        compute_signal(c.close, &ind, &liq, &conf, &ms, &cfg, Some(&cvd), Some(&vol));
+    let (raw, _comps) = compute_signal(
+        c.close,
+        &ind,
+        &liq,
+        &conf,
+        &ms,
+        &cfg,
+        Some(&cvd),
+        Some(&vol),
+    );
     assert_eq!(
         raw, 0,
         "compute_signal must return 0 before SuperTrend is available"
@@ -217,8 +224,16 @@ fn compute_signal_vwap_vote_is_bullish_on_rising_series() {
     }
 
     let last = candles.last().unwrap();
-    let (_raw, comps) =
-        compute_signal(last.close, &ind, &liq, &conf, &ms, &cfg, Some(&cvd), Some(&vol));
+    let (_raw, comps) = compute_signal(
+        last.close,
+        &ind,
+        &liq,
+        &conf,
+        &ms,
+        &cfg,
+        Some(&cvd),
+        Some(&vol),
+    );
 
     // On a monotonically rising same-day series, close should be above VWAP.
     assert_eq!(
@@ -244,8 +259,16 @@ fn compute_signal_vwap_vote_is_bearish_on_falling_series() {
     }
 
     let last = candles.last().unwrap();
-    let (_raw, comps) =
-        compute_signal(last.close, &ind, &liq, &conf, &ms, &cfg, Some(&cvd), Some(&vol));
+    let (_raw, comps) = compute_signal(
+        last.close,
+        &ind,
+        &liq,
+        &conf,
+        &ms,
+        &cfg,
+        Some(&cvd),
+        Some(&vol),
+    );
 
     // On a monotonically falling same-day series, close should be below VWAP.
     assert_eq!(
@@ -335,7 +358,10 @@ fn signal_streak_resets_on_direction_change() {
     let mut streak = SignalStreak::new(2);
     assert!(!streak.update(1), "1 bull");
     // Flip to bear — count resets.
-    assert!(!streak.update(-1), "first bear after reset — should not fire");
+    assert!(
+        !streak.update(-1),
+        "first bear after reset — should not fire"
+    );
     assert!(streak.update(-1), "second consecutive bear — fires");
 }
 
@@ -345,7 +371,10 @@ fn signal_streak_zero_never_fires() {
     assert!(!streak.update(0), "neutral bar");
     assert!(!streak.update(0), "still neutral");
     // Even after a run of zeros, a single non-zero should need required=1 bars.
-    assert!(streak.update(1), "non-zero after zeros fires immediately (required=1)");
+    assert!(
+        streak.update(1),
+        "non-zero after zeros fires immediately (required=1)"
+    );
 }
 
 #[test]
