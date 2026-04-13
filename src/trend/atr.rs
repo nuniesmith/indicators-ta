@@ -89,10 +89,16 @@ impl Indicator for Atr {
         &["high", "low", "close"]
     }
 
-    /// TODO: port Python SMA/EMA-smoothed ATR + normalized output.
+    /// Ports the Python ATR calculation.
     ///
-    /// `crate::functions::atr()` already implements EMA-smoothed ATR.
-    /// For SMA-smoothed, roll the true range manually.
+    /// True range = `max(H−L, |H−prev_C|, |L−prev_C|)`.  For the first bar
+    /// there is no previous close, so `functions::true_range` is expected to
+    /// use `H−L` alone (matching pandas `skipna=True` max behaviour).
+    ///
+    /// SMA path: `tr.rolling(period).mean()` — `NaN` for first `period` bars.
+    /// EMA path: `tr.ewm(span=period, adjust=False).mean()` — value from bar 0.
+    ///
+    /// Normalised ATR = `atr / close * 100` (percentage of price).
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -122,7 +128,9 @@ impl Indicator for Atr {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 14)?;
     let method = match param_str(params, "method", "sma") {
         "ema" => AtrMethod::Ema,

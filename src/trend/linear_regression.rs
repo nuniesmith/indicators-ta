@@ -82,7 +82,10 @@ impl Indicator for LinearRegression {
         &["close"]
     }
 
-    /// TODO: port Python rolling `np.polyfit` slope.
+    /// Ports `rolling(window=period).apply(lambda y: np.polyfit(X, y, 1)[0])`.
+    ///
+    /// OLS slope = `Σ(xᵢ − x̄)(yᵢ − ȳ) / Σ(xᵢ − x̄)²` where `xᵢ = i`.
+    /// This is algebraically identical to `np.polyfit`'s degree-1 coefficient.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -91,7 +94,6 @@ impl Indicator for LinearRegression {
         let p = self.params.period;
         let mut values = vec![f64::NAN; n];
 
-        // TODO: implement rolling OLS slope (matches np.polyfit(X, y, 1)[0]).
         for i in (p - 1)..n {
             values[i] = Self::ols_slope(&prices[(i + 1 - p)..=i]);
         }
@@ -100,7 +102,9 @@ impl Indicator for LinearRegression {
     }
 }
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(LinearRegression::new(LrParams {
         period: param_usize(params, "period", 14)?,
         ..Default::default()

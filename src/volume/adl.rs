@@ -46,7 +46,11 @@ impl Indicator for Adl {
         &["high", "low", "close", "volume"]
     }
 
-    /// TODO: port Python ADL cumsum logic.
+    /// Ports `mfv.cumsum()` where `mfv = mfm * volume` and
+    /// `mfm = ((close - low) - (high - close)) / (high - low)`.
+    ///
+    /// When `high == low` the multiplier is clamped to `0` (matching the
+    /// Python `mfm[high == low] = 0` mask), so no divide-by-zero can occur.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -55,7 +59,6 @@ impl Indicator for Adl {
             .iter()
             .map(|c| {
                 let range = c.high - c.low;
-                // TODO: port Python mfm formula
                 let mfm = if range == 0.0 {
                     0.0
                 } else {
@@ -72,7 +75,9 @@ impl Indicator for Adl {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(_params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    _params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(Adl::new()))
 }
 

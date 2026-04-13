@@ -61,7 +61,10 @@ impl Indicator for ChoppinessIndex {
         &["high", "low"]
     }
 
-    /// TODO: port Python log10-based choppiness formula.
+    /// Ports `100 * log10(sum_atr / (max_high - min_low)) / log10(period)`.
+    ///
+    /// `sum_atr` = rolling sum of `high - low` (true range for OHLC-equal bars).
+    /// Returns `NaN` when the denominator or `log10(period)` is zero.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -71,7 +74,6 @@ impl Indicator for ChoppinessIndex {
 
         let mut values = vec![f64::NAN; n];
 
-        // TODO: port Python rolling logic.
         for i in (p - 1)..n {
             let window = &candles[(i + 1 - p)..=i];
             let atr_sum: f64 = window.iter().map(|c| c.high - c.low).sum();
@@ -92,7 +94,9 @@ impl Indicator for ChoppinessIndex {
     }
 }
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(ChoppinessIndex::new(ChopParams {
         period: param_usize(params, "period", 14)?,
     })))

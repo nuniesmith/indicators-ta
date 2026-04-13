@@ -89,12 +89,11 @@ impl Indicator for Sma {
         &["close"] // adjusts if column != Close, but close is the default
     }
 
-    /// TODO: port Python rolling-mean logic.
+    /// Ports `data[self.column].rolling(window=self.period).mean()`.
     ///
-    /// Python:
-    /// ```python
-    /// sma = data[self.column].rolling(window=self.period).mean()
-    /// ```
+    /// Produces `NaN` for the first `period - 1` positions (matching pandas
+    /// `rolling(window=N)` default of `min_periods=N`), then the arithmetic
+    /// mean of the most recent `period` prices.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -104,7 +103,6 @@ impl Indicator for Sma {
 
         let mut values = vec![f64::NAN; n];
 
-        // TODO: Replace with ported rolling-mean implementation.
         for i in (period - 1)..n {
             let sum: f64 = prices[(i + 1 - period)..=i].iter().sum();
             values[i] = sum / period as f64;
@@ -117,7 +115,9 @@ impl Indicator for Sma {
 // ── Registry factory ──────────────────────────────────────────────────────────
 
 /// Factory function registered under `"sma"` in the global registry.
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 20)?;
     let column = match param_str(params, "column", "close") {
         "open" => PriceColumn::Open,

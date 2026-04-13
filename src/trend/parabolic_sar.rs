@@ -62,7 +62,18 @@ impl Indicator for ParabolicSar {
         &["high", "low"]
     }
 
-    /// TODO: port Python iterative SAR state machine.
+    /// Ports the iterative SAR state machine.
+    ///
+    /// Initialisation matches the Python source exactly:
+    /// - `sar[0] = 0.0`  (Python uses `np.zeros(len(data))`)
+    /// - `ep  = candles[0].low`
+    /// - `af  = step`
+    /// - trend starts as uptrend (`1`)
+    ///
+    /// The `sar[0] = 0.0` cold-start means the first computed value
+    /// `sar[1] = af * ep` is typically well below market price, but this
+    /// is intentional — it replicates the Python behaviour and the SAR
+    /// converges toward price rapidly.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -75,7 +86,6 @@ impl Indicator for ParabolicSar {
         let mut ep = candles[0].low;
         let mut af = step;
 
-        // TODO: port Python loop exactly.
         for i in 1..n {
             let prev_sar = sar[i - 1];
             sar[i] = prev_sar + af * (ep - prev_sar);
@@ -109,7 +119,9 @@ impl Indicator for ParabolicSar {
     }
 }
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(ParabolicSar::new(PsarParams {
         step: param_f64(params, "step", 0.02)?,
         max_step: param_f64(params, "max_step", 0.2)?,

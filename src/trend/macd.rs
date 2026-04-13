@@ -58,7 +58,6 @@ impl Macd {
     pub fn new(params: MacdParams) -> Self {
         Self { params }
     }
-
 }
 
 impl Default for Macd {
@@ -83,7 +82,8 @@ impl Indicator for Macd {
 
     /// Delegates to the existing `crate::functions::macd()`.
     ///
-    /// TODO: verify output key naming matches Python (`MACD_line` etc.)
+    /// Output key names `"MACD_line"`, `"MACD_signal"`, `"MACD_histogram"` match
+    /// the Python pattern `f"{self.name}_{suffix}"` where `self.name = "MACD"`.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -105,7 +105,9 @@ impl Indicator for Macd {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(Macd::new(MacdParams {
         fast_period: crate::registry::param_usize(params, "fast_period", 12)?,
         slow_period: crate::registry::param_usize(params, "slow_period", 26)?,

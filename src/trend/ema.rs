@@ -90,32 +90,60 @@ impl Indicator for Ema {
         &["close"]
     }
 
-    /// TODO: port Python ewm logic.
+    /// Ports Python `ewm(span=period, adjust=False, alpha=alpha).mean()`.
     ///
-    /// Delegate to `crate::functions::ema()` which already implements SMA-seeded EMA.
-    /// The alpha override from Python's `ewm(alpha=...)` is the only delta to handle.
+    /// Delegates to `crate::functions::ema()` when alpha matches the standard
+    /// `2/(period+1)` formula, and uses a local SMA-seeded EMA loop when a
+    /// custom alpha is provided.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
         let prices = self.params.column.extract(candles);
-        let _alpha = self.params.effective_alpha();
-        let _n = prices.len();
+        let alpha = self.params.effective_alpha();
         let period = self.params.period;
+        let default_alpha = 2.0 / (period as f64 + 1.0);
 
-        // TODO: honour custom alpha; functions::ema() uses 2/(period+1) only.
-        // If alpha matches the default, we can delegate directly:
-        let values = functions::ema(&prices, period)?;
-
-        // If a custom alpha is set, recompute:
-        // let values = ema_with_alpha(&prices, period, alpha);
+        let values = if (alpha - default_alpha).abs() < f64::EPSILON {
+            // Fast path: delegate to the shared batch implementation.
+            functions::ema(&prices, period)?
+        } else {
+            // Custom alpha path: SMA-seed then apply caller-supplied smoothing factor.
+            ema_with_alpha(&prices, period, alpha)?
+        };
 
         Ok(IndicatorOutput::from_pairs([(self.output_key(), values)]))
     }
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// SMA-seeded EMA with a caller-supplied smoothing factor.
+///
+/// Mirrors Python `series.ewm(span=period, adjust=False, alpha=alpha).mean()`.
+/// The seed (index `period-1`) is the arithmetic mean of the first `period`
+/// values; subsequent values follow `ema[i] = alpha * price[i] + (1-alpha) * ema[i-1]`.
+fn ema_with_alpha(prices: &[f64], period: usize, alpha: f64) -> Result<Vec<f64>, IndicatorError> {
+    if prices.len() < period {
+        return Err(IndicatorError::InsufficientData {
+            required: period,
+            available: prices.len(),
+        });
+    }
+    let mut result = vec![f64::NAN; prices.len()];
+    let seed: f64 = prices.iter().take(period).sum::<f64>() / period as f64;
+    result[period - 1] = seed;
+    let one_minus = 1.0 - alpha;
+    for i in period..prices.len() {
+        result[i] = prices[i] * alpha + result[i - 1] * one_minus;
+    }
+    Ok(result)
+}
+
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 20)?;
     let alpha = if params.contains_key("alpha") {
         Some(param_f64(params, "alpha", 2.0 / (period as f64 + 1.0))?)
@@ -189,6 +217,44 @@ mod tests {
         let vals = out.get("EMA_3").unwrap();
         let expected = 40.0 * 0.5 + 20.0 * 0.5;
         assert!((vals[3] - expected).abs() < 1e-6, "got {}", vals[3]);
+    }
+
+    #[test]
+    fn ema_custom_alpha_differs_from_default() {
+        // alpha=0.1 ≠ 2/(3+1)=0.5; after the seed the two paths diverge.
+        let closes = vec![10.0, 20.0, 30.0, 40.0];
+        let default_out = Ema::with_period(3).calculate(&candles(&closes)).unwrap();
+        let custom_out = Ema::new(EmaParams {
+            period: 3,
+            alpha: Some(0.1),
+            column: PriceColumn::Close,
+        })
+        .calculate(&candles(&closes))
+        .unwrap();
+        let d = default_out.get("EMA_3").unwrap();
+        let c = custom_out.get("EMA_3").unwrap();
+        // Seed (index 2) is the same SMA regardless of alpha.
+        assert!((c[2] - d[2]).abs() < 1e-9);
+        // After seed, alpha=0.1 must produce a different value than alpha=0.5.
+        assert!(
+            (c[3] - d[3]).abs() > 1e-6,
+            "custom alpha should differ: {}",
+            c[3]
+        );
+    }
+
+    #[test]
+    fn ema_custom_alpha_correct_value() {
+        // Seed = (10+20+30)/3 = 20; EMA[3] = 40*0.1 + 20*0.9 = 22.0
+        let closes = vec![10.0, 20.0, 30.0, 40.0];
+        let ema = Ema::new(EmaParams {
+            period: 3,
+            alpha: Some(0.1),
+            column: PriceColumn::Close,
+        });
+        let out = ema.calculate(&candles(&closes)).unwrap();
+        let vals = out.get("EMA_3").unwrap();
+        assert!((vals[3] - 22.0).abs() < 1e-9, "got {}", vals[3]);
     }
 
     #[test]

@@ -111,8 +111,6 @@ impl IndicatorOutput {
 ///     fn required_columns(&self) -> &[&str] { &["close"] }
 ///
 ///     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
-///         // port Python logic here
-///         todo!()
 ///     }
 /// }
 /// ```

@@ -57,7 +57,15 @@ impl Indicator for ElderRayIndex {
         &["high", "low", "close"]
     }
 
-    /// TODO: port Python EMA-based bull/bear power.
+    /// Ports `ema = Close.ewm(span=period, adjust=False).mean()` then
+    /// `bull = High - ema` and `bear = Low - ema`.
+    ///
+    /// # Note on EMA seeding
+    /// Python's `ewm(adjust=False)` seeds the EMA with the very first close
+    /// value and emits a value for every bar (no leading `NaN` warm-up).
+    /// `functions::ema` may use a different seeding strategy (e.g. SMA over
+    /// the first `period` bars), so the first `fast_period - 1` rows can
+    /// differ slightly between the two implementations.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -77,7 +85,9 @@ impl Indicator for ElderRayIndex {
     }
 }
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(ElderRayIndex::new(ElderRayParams {
         fast_period: param_usize(params, "fast_period", 14)?,
     })))

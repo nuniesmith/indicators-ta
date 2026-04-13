@@ -77,12 +77,11 @@ impl Indicator for Wma {
         &["close"]
     }
 
-    /// TODO: port Python linear-weight rolling calculation.
+    /// Ports `rolling(window=period).apply(lambda x: np.sum(weights * x) / weights.sum())`.
     ///
-    /// Port plan:
-    /// 1. `prices = self.params.column.extract(candles)`
-    /// 2. `weight_sum = period * (period + 1) / 2`
-    /// 3. For each window of length `period`, dot-product with `[1..=period]`.
+    /// Weights are linear: position `j` (0-based within the window) receives
+    /// weight `j + 1`.  Denominator = `period * (period + 1) / 2`.
+    /// Produces `NaN` for the first `period - 1` positions.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -93,7 +92,6 @@ impl Indicator for Wma {
 
         let mut values = vec![f64::NAN; n];
 
-        // TODO: implement this rolling weighted sum.
         for i in (period - 1)..n {
             let window = &prices[(i + 1 - period)..=i];
             let weighted: f64 = window
@@ -110,7 +108,9 @@ impl Indicator for Wma {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 14)?;
     let column = match param_str(params, "column", "close") {
         "open" => PriceColumn::Open,

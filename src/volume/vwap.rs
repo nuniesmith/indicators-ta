@@ -74,7 +74,11 @@ impl Indicator for Vwap {
         &["high", "low", "close", "volume"]
     }
 
-    /// TODO: port Python cumulative / rolling VWAP.
+    /// Cumulative VWAP:  `cumsum(tp * vol) / cumsum(vol)` — no NaN warm-up.
+    /// Rolling VWAP:     `rolling_sum(tp * vol, N) / rolling_sum(vol, N)` —
+    ///                   `NaN` for the first `period - 1` positions.
+    ///
+    /// `tp` (typical price) = `(high + low + close) / 3`.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -92,7 +96,7 @@ impl Indicator for Vwap {
 
         let values = match self.params.period {
             None => {
-                // TODO: cumulative VWAP
+                // Cumulative VWAP — produces a value for every bar.
                 let mut cum_vp = 0.0f64;
                 let mut cum_vol = 0.0f64;
                 vp.iter()
@@ -109,7 +113,7 @@ impl Indicator for Vwap {
                     .collect()
             }
             Some(period) => {
-                // TODO: rolling VWAP
+                // Rolling VWAP — NaN for first `period - 1` bars.
                 let mut values = vec![f64::NAN; n];
                 for i in (period - 1)..n {
                     let sum_vp: f64 = vp[(i + 1 - period)..=i].iter().sum();
@@ -130,7 +134,9 @@ impl Indicator for Vwap {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = if params.contains_key("period") {
         Some(param_usize(params, "period", 0)?)
     } else {

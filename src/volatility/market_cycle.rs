@@ -75,7 +75,8 @@ impl Indicator for MarketCycle {
         &["close"]
     }
 
-    /// TODO: port Python momentum-based phase assignment with transition rules.
+    /// Detects market cycle phase for each bar using price momentum and
+    /// transition rules that mirror Python's pandas vectorised assignments.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -96,11 +97,18 @@ impl Indicator for MarketCycle {
             };
         }
 
-        // Step 2: apply transition rules (mirrors Python cycle.loc[...] assignments).
-        // TODO: port Python shift-based rule application.
+        // Step 2: apply transition rules, matching Python's pandas semantics.
+        //
+        // Python does:
+        //   cycle.loc[(cycle.shift(1) == "Markdown") & (cycle != "Markdown")] = "Accumulation"
+        //   cycle.loc[(cycle.shift(1) == "Markup")   & (cycle != "Markup")]   = "Distribution"
+        //
+        // `cycle.shift(1)` in the second rule sees Accumulation values already
+        // written by the first rule.  We replicate this by reading from `result`
+        // (the output being built) rather than from the original `phases` slice.
         let mut result = phases.clone();
         for i in 1..n {
-            match (phases[i - 1], phases[i]) {
+            match (result[i - 1], phases[i]) {
                 (CyclePhase::Markdown, p) if p != CyclePhase::Markdown => {
                     result[i] = CyclePhase::Accumulation;
                 }
@@ -120,7 +128,9 @@ impl Indicator for MarketCycle {
     }
 }
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(MarketCycle::new(MarketCycleParams {
         momentum_period: param_usize(params, "momentum_period", 1)?,
     })))

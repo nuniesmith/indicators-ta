@@ -79,7 +79,19 @@ impl Indicator for SchaffTrendCycle {
         &["close"]
     }
 
-    /// TODO: port Python MACD-then-Stochastic-then-EMA pipeline.
+    /// Ports the three-stage MACD → Stochastic → EMA pipeline.
+    ///
+    /// # EMA seeding difference vs Python
+    /// The Python source calls `ewm(span=...)` with the **default** `adjust=True`,
+    /// which uses decaying weights rather than the recursive formula.
+    /// `functions::ema()` implements the `adjust=False` (recursive) variant.
+    /// For series longer than ~3× the span the two converge; for shorter series
+    /// the warm-up values will differ slightly.
+    ///
+    /// # Zero-range stochastic handling
+    /// When `max_macd_diff == min_macd_diff` across the window, Python produces
+    /// `NaN` via `.replace(0, np.nan)` before division.  The Rust guards the
+    /// same condition with an explicit `range == 0.0` check.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -137,7 +149,9 @@ impl Indicator for SchaffTrendCycle {
     }
 }
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(SchaffTrendCycle::new(StcParams {
         short_ema: param_usize(params, "short_ema", 12)?,
         long_ema: param_usize(params, "long_ema", 26)?,

@@ -58,7 +58,11 @@ impl Indicator for WilliamsR {
         &["high", "low", "close"]
     }
 
-    /// TODO: port Python rolling max/min %R formula.
+    /// Ports `-100 * (highest_high - close) / (highest_high - lowest_low)`.
+    ///
+    /// When `highest_high == lowest_low` Python produces `NaN` via float
+    /// division by zero; the Rust guards this explicitly with a
+    /// `range == 0.0` check.  Both paths produce `NaN` for that bar.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -66,7 +70,6 @@ impl Indicator for WilliamsR {
         let p = self.params.period;
         let mut values = vec![f64::NAN; n];
 
-        // TODO: port Python rolling max/min.
         for i in (p - 1)..n {
             let window = &candles[(i + 1 - p)..=i];
             let highest_h = window
@@ -86,7 +89,9 @@ impl Indicator for WilliamsR {
     }
 }
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(WilliamsR::new(WrParams {
         period: param_usize(params, "period", 14)?,
     })))

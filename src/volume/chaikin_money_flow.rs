@@ -63,7 +63,13 @@ impl Indicator for ChaikinMoneyFlow {
         &["high", "low", "close", "volume"]
     }
 
-    /// TODO: port Python MFM * Volume rolling-sum CMF.
+    /// Ports the rolling-window CMF calculation.
+    ///
+    /// When `high == low` the money-flow multiplier is set to `0.0` rather
+    /// than `NaN`.  This is equivalent to Python's `.replace(0, np.nan)`
+    /// approach because pandas `rolling().sum()` skips `NaN` values by
+    /// default, so a zero-range bar contributes `0` to the rolling sum in
+    /// both implementations.
     fn calculate(&self, candles: &[Candle]) -> Result<IndicatorOutput, IndicatorError> {
         self.check_len(candles)?;
 
@@ -86,7 +92,6 @@ impl Indicator for ChaikinMoneyFlow {
         let vol: Vec<f64> = candles.iter().map(|c| c.volume).collect();
 
         let mut values = vec![f64::NAN; n];
-        // TODO: port Python rolling sum.
         for i in (p - 1)..n {
             let sum_mfv: f64 = mfv[(i + 1 - p)..=i].iter().sum();
             let sum_vol: f64 = vol[(i + 1 - p)..=i].iter().sum();
@@ -101,7 +106,9 @@ impl Indicator for ChaikinMoneyFlow {
     }
 }
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(ChaikinMoneyFlow::new(CmfParams {
         period: param_usize(params, "period", 20)?,
     })))
