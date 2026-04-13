@@ -2,9 +2,9 @@ mod common;
 use common::*;
 
 use indicators::indicator::Indicator;
-use indicators::trend::macd::{Macd, MacdParams};
-use indicators::trend::atr::{Atr, AtrMethod, AtrParams};
 use indicators::momentum::schaff_trend_cycle::{SchaffTrendCycle, StcParams};
+use indicators::trend::atr::{Atr, AtrMethod, AtrParams};
+use indicators::trend::macd::Macd;
 
 const EPS: f64 = 1e-7;
 
@@ -15,9 +15,12 @@ const EPS: f64 = 1e-7;
 #[test]
 fn macd_three_output_columns_present() {
     let out = Macd::default().calculate(&ref_candles()).unwrap();
-    assert!(out.get("MACD_line").is_some(),      "missing MACD_line");
-    assert!(out.get("MACD_signal").is_some(),    "missing MACD_signal");
-    assert!(out.get("MACD_histogram").is_some(), "missing MACD_histogram");
+    assert!(out.get("MACD_line").is_some(), "missing MACD_line");
+    assert!(out.get("MACD_signal").is_some(), "missing MACD_signal");
+    assert!(
+        out.get("MACD_histogram").is_some(),
+        "missing MACD_histogram"
+    );
 }
 
 #[test]
@@ -48,12 +51,17 @@ fn macd_signal_last_value() {
 fn macd_histogram_equals_line_minus_signal() {
     // histogram = macd_line - signal_line, every bar.
     let out = Macd::default().calculate(&ref_candles()).unwrap();
-    let line   = out.get("MACD_line").unwrap();
+    let line = out.get("MACD_line").unwrap();
     let signal = out.get("MACD_signal").unwrap();
-    let hist   = out.get("MACD_histogram").unwrap();
+    let hist = out.get("MACD_histogram").unwrap();
     for i in 0..30 {
         if !line[i].is_nan() && !signal[i].is_nan() {
-            assert_close(hist[i], line[i] - signal[i], 1e-12, &format!("MACD hist[{i}]"));
+            assert_close(
+                hist[i],
+                line[i] - signal[i],
+                1e-12,
+                &format!("MACD hist[{i}]"),
+            );
         }
     }
 }
@@ -78,7 +86,11 @@ fn macd_uptrend_line_is_positive() {
     let line = out.get("MACD_line").unwrap();
     for i in 25..50 {
         if !line[i].is_nan() {
-            assert!(line[i] > 0.0, "MACD line[{i}]={} should be > 0 in uptrend", line[i]);
+            assert!(
+                line[i] > 0.0,
+                "MACD line[{i}]={} should be > 0 in uptrend",
+                line[i]
+            );
         }
     }
 }
@@ -86,7 +98,9 @@ fn macd_uptrend_line_is_positive() {
 #[test]
 fn macd_constant_series_all_zeros() {
     // EMA of a constant equals that constant → MACD components all zero.
-    let out = Macd::default().calculate(&close_candles(&[100.0_f64; 50])).unwrap();
+    let out = Macd::default()
+        .calculate(&close_candles(&[100.0_f64; 50]))
+        .unwrap();
     let line = out.get("MACD_line").unwrap();
     for i in 0..50 {
         if !line[i].is_nan() {
@@ -98,7 +112,9 @@ fn macd_constant_series_all_zeros() {
 #[test]
 fn macd_insufficient_data_is_error() {
     use indicators::error::IndicatorError;
-    let err = Macd::default().calculate(&close_candles(&[1.0; 5])).unwrap_err();
+    let err = Macd::default()
+        .calculate(&close_candles(&[1.0; 5]))
+        .unwrap_err();
     assert!(matches!(err, IndicatorError::InsufficientData { .. }));
 }
 
@@ -123,20 +139,33 @@ fn atr_sma5_last_value() {
 #[test]
 fn atr_ema5_last_value() {
     // Python (adjust=False): atr_ema5.iloc[29] = 2.9473...
-    let params = AtrParams { period: 5, method: AtrMethod::Ema };
+    let params = AtrParams {
+        period: 5,
+        method: AtrMethod::Ema,
+    };
     let out = Atr::new(params).calculate(&ref_candles()).unwrap();
-    assert_close(out.get("ATR_5").unwrap()[29], 2.9473_6543_61, 1e-6, "ATR_ema5[29]");
+    assert_close(
+        out.get("ATR_5").unwrap()[29],
+        2.9473_6543_61,
+        1e-6,
+        "ATR_ema5[29]",
+    );
 }
 
 #[test]
 fn atr_normalized_is_atr_over_close_times_100() {
     // norm = atr / close * 100, verified at every non-NaN position.
     let out = Atr::with_period(5).calculate(&ref_candles()).unwrap();
-    let atr_vals  = out.get("ATR_5").unwrap();
+    let atr_vals = out.get("ATR_5").unwrap();
     let norm_vals = out.get("ATR_5_normalized").unwrap();
     for (i, &(_, _, c, _)) in BARS.iter().enumerate() {
         if !atr_vals[i].is_nan() {
-            assert_close(norm_vals[i], atr_vals[i] / c * 100.0, 1e-12, &format!("norm[{i}]"));
+            assert_close(
+                norm_vals[i],
+                atr_vals[i] / c * 100.0,
+                1e-12,
+                &format!("norm[{i}]"),
+            );
         }
     }
 }
@@ -144,8 +173,11 @@ fn atr_normalized_is_atr_over_close_times_100() {
 #[test]
 fn atr_both_output_columns_present() {
     let out = Atr::with_period(5).calculate(&ref_candles()).unwrap();
-    assert!(out.get("ATR_5").is_some(),            "missing ATR_5");
-    assert!(out.get("ATR_5_normalized").is_some(), "missing ATR_5_normalized");
+    assert!(out.get("ATR_5").is_some(), "missing ATR_5");
+    assert!(
+        out.get("ATR_5_normalized").is_some(),
+        "missing ATR_5_normalized"
+    );
 }
 
 #[test]
@@ -170,7 +202,10 @@ fn atr_constant_ohlc_has_zero_tr() {
 fn atr_ema_starts_at_bar0_no_leading_nan() {
     // EMA-smoothed ATR: ewm(adjust=False) emits a value from bar 0.
     // We only check that bars past required_len are non-NaN.
-    let params = AtrParams { period: 5, method: AtrMethod::Ema };
+    let params = AtrParams {
+        period: 5,
+        method: AtrMethod::Ema,
+    };
     let out = Atr::new(params).calculate(&ref_candles()).unwrap();
     let vals = out.get("ATR_5").unwrap();
     // At minimum, values from bar 5 onward must be finite.
@@ -182,7 +217,10 @@ fn atr_sma_leading_nans() {
     // SMA-smoothed: first period-1 TR values have no complete window.
     let out = Atr::with_period(5).calculate(&ref_candles()).unwrap();
     // Bar 0: only one bar of TR; SMA(5) not yet full → NaN.
-    assert!(out.get("ATR_5").unwrap()[0].is_nan(), "ATR_sma[0] should be NaN");
+    assert!(
+        out.get("ATR_5").unwrap()[0].is_nan(),
+        "ATR_sma[0] should be NaN"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -191,7 +229,9 @@ fn atr_sma_leading_nans() {
 
 #[test]
 fn stc_output_column_present() {
-    let out = SchaffTrendCycle::default().calculate(&ref_candles()).unwrap();
+    let out = SchaffTrendCycle::default()
+        .calculate(&ref_candles())
+        .unwrap();
     assert!(out.get("STC").is_some());
 }
 
@@ -200,7 +240,9 @@ fn stc_last_value() {
     // Python (adjust=False throughout): stc value at bar 29 is non-NaN and in [0, 100].
     // Note: Python source uses adjust=True (default), Rust uses adjust=False.
     // These converge on long series; allow wider tolerance.
-    let out = SchaffTrendCycle::default().calculate(&ref_candles()).unwrap();
+    let out = SchaffTrendCycle::default()
+        .calculate(&ref_candles())
+        .unwrap();
     let val = out.get("STC").unwrap()[29];
     assert!(!val.is_nan(), "STC[29] should not be NaN");
     // Check it is in the expected ballpark (EMA adjust difference may cause
@@ -211,7 +253,9 @@ fn stc_last_value() {
 #[test]
 fn stc_bounded_0_to_100() {
     // STC oscillates between 0 and 100 by construction.
-    let out = SchaffTrendCycle::default().calculate(&ref_candles()).unwrap();
+    let out = SchaffTrendCycle::default()
+        .calculate(&ref_candles())
+        .unwrap();
     assert_all_non_nan(
         out.get("STC").unwrap(),
         |v| (0.0..=100.0).contains(&v),
@@ -222,8 +266,13 @@ fn stc_bounded_0_to_100() {
 #[test]
 fn stc_no_signal_smoothing_also_bounded() {
     // signal_period = 0 disables the final EMA, but STC should still be [0, 100].
-    let params = StcParams { signal_period: 0, ..Default::default() };
-    let out = SchaffTrendCycle::new(params).calculate(&ref_candles()).unwrap();
+    let params = StcParams {
+        signal_period: 0,
+        ..Default::default()
+    };
+    let out = SchaffTrendCycle::new(params)
+        .calculate(&ref_candles())
+        .unwrap();
     assert_all_non_nan(
         out.get("STC").unwrap(),
         |v| (0.0..=100.0).contains(&v),

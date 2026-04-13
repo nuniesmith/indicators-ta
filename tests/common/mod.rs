@@ -1,4 +1,5 @@
 /// Common test helpers shared across indicator integration tests.
+// Not every file in the test suite uses every helper; suppress the noise.
 
 // ── 30-bar reference dataset ──────────────────────────────────────────────────
 //

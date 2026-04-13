@@ -6,7 +6,6 @@
 /// - "any" mode fires at least one long signal on a sustained uptrend
 /// - `SignalStreak` confirmation filter (required count, direction reset, zero handling)
 mod common;
-use common::*;
 
 use indicators::{
     indicator::Indicator,

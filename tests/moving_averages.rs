@@ -3,7 +3,7 @@ use common::*;
 
 use indicators::indicator::{Indicator, PriceColumn};
 use indicators::trend::sma::{Sma, SmaParams};
-use indicators::trend::wma::{Wma, WmaParams};
+use indicators::trend::wma::Wma;
 
 const EPS: f64 = 1e-7;
 

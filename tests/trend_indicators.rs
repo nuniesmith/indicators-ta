@@ -2,11 +2,11 @@ mod common;
 use common::*;
 
 use indicators::indicator::Indicator;
-use indicators::volatility::choppiness_index::{ChoppinessIndex, ChopParams};
-use indicators::momentum::williams_r::{WilliamsR, WrParams};
-use indicators::trend::linear_regression::{LinearRegression, LrParams};
+use indicators::volatility::choppiness_index::ChoppinessIndex;
+use indicators::momentum::williams_r::WilliamsR;
+use indicators::trend::linear_regression::LinearRegression;
 use indicators::trend::parabolic_sar::{ParabolicSar, PsarParams};
-use indicators::volatility::elder_ray_index::{ElderRayIndex, ElderRayParams};
+use indicators::volatility::elder_ray_index::ElderRayIndex;
 
 const EPS: f64 = 1e-7;
 

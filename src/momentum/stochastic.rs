@@ -120,8 +120,12 @@ impl Indicator for Stochastic {
     }
 }
 
-/// Rolling SMA over a `Vec<f64>` that may contain leading NaN values.
-/// The first valid window requires `period` consecutive non-NaN values.
+/// Rolling SMA over a `Vec<f64>` that may contain leading or mid-series NaN values.
+///
+/// `consecutive` counts the unbroken run of non-NaN values ending at the current
+/// position.  A window is only emitted once `consecutive >= period`, which
+/// guarantees that every element of the slice `src[(i+1-period)..=i]` is
+/// non-NaN — no special NaN-sum guard is needed in the inner loop.
 fn sma_of(src: &[f64], period: usize) -> Vec<f64> {
     let n = src.len();
     let mut out = vec![f64::NAN; n];
@@ -143,7 +147,9 @@ fn sma_of(src: &[f64], period: usize) -> Vec<f64> {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(Stochastic::new(StochParams {
         k_period: param_usize(params, "k_period", 14)?,
         smooth_k: param_usize(params, "smooth_k", 3)?,

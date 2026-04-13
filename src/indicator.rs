@@ -11,7 +11,7 @@
 //! `Box<dyn Indicator>` values so they can be created by name at
 //! runtime, matching Python's `@register_indicator` / `IndicatorRegistry`.
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use crate::error::IndicatorError;
 use crate::types::Candle;
@@ -23,9 +23,13 @@ use crate::types::Candle;
 /// Keys are column names such as `"SMA_20"`, `"MACD_line"`, `"ATR_14"`.
 /// Values are aligned `Vec<f64>` of the same length as the input slice.
 /// Leading warm-up entries are `f64::NAN`.
+///
+/// Columns are stored in an [`IndexMap`] so iteration order matches insertion
+/// order — the order indicators push their columns in `from_pairs` / `insert`.
+/// This makes display, serialisation, and tests deterministic without sorting.
 #[derive(Debug, Clone, Default)]
 pub struct IndicatorOutput {
-    columns: HashMap<String, Vec<f64>>,
+    columns: IndexMap<String, Vec<f64>>,
 }
 
 impl IndicatorOutput {
@@ -80,7 +84,7 @@ impl IndicatorOutput {
     }
 
     /// Consume into the underlying map.
-    pub fn into_inner(self) -> HashMap<String, Vec<f64>> {
+    pub fn into_inner(self) -> IndexMap<String, Vec<f64>> {
         self.columns
     }
 }

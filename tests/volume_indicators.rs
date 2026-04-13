@@ -2,9 +2,9 @@ mod common;
 use common::*;
 
 use indicators::indicator::Indicator;
-use indicators::volume::vwap::{Vwap, VwapParams};
+use indicators::volume::vwap::Vwap;
 use indicators::volume::adl::Adl;
-use indicators::volume::chaikin_money_flow::{ChaikinMoneyFlow, CmfParams};
+use indicators::volume::chaikin_money_flow::ChaikinMoneyFlow;
 
 const EPS: f64 = 1e-7;
 
