@@ -29,7 +29,9 @@ impl VolumeZoneOscillator {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 14)?;
     Ok(Box::new(VolumeZoneOscillator::new(period)))
 }

@@ -78,7 +78,9 @@ impl Indicator for CvdIndicator {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let slope_bars = param_usize(params, "slope_bars", 10)?;
     let div_lookback = param_usize(params, "div_lookback", 20)?;
     Ok(Box::new(CvdIndicator::new(CvdParams {

@@ -87,7 +87,9 @@ impl Indicator for DetectorIndicator {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let adx_period = param_usize(params, "adx_period", 14)?;
     let bb_period = param_usize(params, "bb_period", 20)?;
     let config = RegimeConfig {

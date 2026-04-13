@@ -92,7 +92,9 @@ impl Indicator for HmmIndicator {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let min_observations = param_usize(params, "min_observations", 100)?;
     let n_states = param_usize(params, "n_states", 3)?;
     let config = HMMConfig {

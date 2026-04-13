@@ -111,7 +111,9 @@ impl Indicator for VolumeRegime {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let atr_period = param_usize(params, "atr_period", 14)?;
     let pct_window = param_usize(params, "pct_window", 100)?;
     Ok(Box::new(VolumeRegime::new(VolumeRegimeParams {

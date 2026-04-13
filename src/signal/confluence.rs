@@ -82,7 +82,9 @@ impl Indicator for ConfluenceIndicator {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let fast_len = param_usize(params, "fast_len", 8)?;
     let slow_len = param_usize(params, "slow_len", 21)?;
     let trend_len = param_usize(params, "trend_len", 50)?;

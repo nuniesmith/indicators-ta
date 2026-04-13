@@ -234,7 +234,9 @@ impl Indicator for BbPrimIndicator {
 
 /// Default factory registers as `"primitives"` → produces [`AdxIndicator`].
 /// Use the individual wrapper structs directly for EMA, ATR, RSI, or BB.
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 14)?;
     Ok(Box::new(AdxIndicator::new(period)))
 }

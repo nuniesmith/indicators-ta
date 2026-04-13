@@ -15,19 +15,17 @@
 ///
 /// 3. `signal_pipeline` — full `SignalIndicator::calculate()` end-to-end for
 ///    different candle-slice sizes.  This is the realistic production cost.
-use criterion::{BatchSize, BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 
 use indicators::{
-    IndicatorConfig, IndicatorConfig as Cfg, Indicators, SignalIndicator,
+    IndicatorConfig, IndicatorConfig as Cfg, Indicators, SignalIndicator, compute_signal,
     indicator::Indicator,
     signal::{
-        confluence::ConfluenceEngine,
-        cvd::CVDTracker,
-        liquidity::LiquidityProfile,
-        structure::MarketStructure,
-        vol_regime::VolatilityPercentile,
+        confluence::ConfluenceEngine, cvd::CVDTracker, liquidity::LiquidityProfile,
+        structure::MarketStructure, vol_regime::VolatilityPercentile,
     },
-    compute_signal,
     types::Candle,
 };
 
@@ -41,7 +39,7 @@ fn rising_candles(n: usize) -> Vec<Candle> {
             let wave = (i as f64 * 0.3).sin() * 0.5;
             let c = 100.0 + i as f64 * 0.25 + wave;
             Candle {
-                time: i as i64 * 60_000,
+                time: i64::try_from(i).unwrap() * 60_000,
                 open: c - 0.15,
                 high: c + 0.35,
                 low: c - 0.35,
@@ -59,18 +57,14 @@ fn bench_engine_update(c: &mut Criterion) {
 
     for &n_bars in &[100usize, 200, 500] {
         let candles = rising_candles(n_bars);
-        group.bench_with_input(
-            BenchmarkId::from_parameter(n_bars),
-            &candles,
-            |b, cs| {
-                b.iter(|| {
-                    let mut ind = Indicators::new(Cfg::default());
-                    for candle in cs {
-                        black_box(ind.update(black_box(candle)));
-                    }
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(n_bars), &candles, |b, cs| {
+            b.iter(|| {
+                let mut ind = Indicators::new(Cfg::default());
+                for candle in cs {
+                    black_box(ind.update(black_box(candle)));
+                }
+            });
+        });
     }
 
     group.finish();
@@ -91,10 +85,7 @@ fn bench_engine_hot_bar(c: &mut Criterion) {
     let warmup_candles = rising_candles(warmup_n);
 
     // The candle that will actually be measured.
-    let measure_candle = rising_candles(warmup_n + 1)
-        .into_iter()
-        .last()
-        .unwrap();
+    let measure_candle = rising_candles(warmup_n + 1).into_iter().last().unwrap();
 
     c.bench_function("engine_hot_bar_150_kmeans_plus_hurst", |b| {
         b.iter_batched(
@@ -121,10 +112,7 @@ fn bench_engine_hot_bar(c: &mut Criterion) {
 fn bench_engine_normal_bar(c: &mut Criterion) {
     let warmup_n: usize = 155;
     let warmup_candles = rising_candles(warmup_n);
-    let measure_candle = rising_candles(warmup_n + 1)
-        .into_iter()
-        .last()
-        .unwrap();
+    let measure_candle = rising_candles(warmup_n + 1).into_iter().last().unwrap();
 
     c.bench_function("engine_normal_bar_155_no_recompute", |b| {
         b.iter_batched(
@@ -150,13 +138,9 @@ fn bench_signal_pipeline(c: &mut Criterion) {
         let candles = rising_candles(n_bars);
         let si = SignalIndicator::with_defaults();
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(n_bars),
-            &candles,
-            |b, cs| {
-                b.iter(|| black_box(si.calculate(black_box(cs)).unwrap()));
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(n_bars), &candles, |b, cs| {
+            b.iter(|| black_box(si.calculate(black_box(cs)).unwrap()));
+        });
     }
 
     group.finish();
@@ -190,8 +174,14 @@ fn bench_streaming_per_bar(c: &mut Criterion) {
                 vol.update(ind.atr);
 
                 black_box(compute_signal(
-                    c.close, &ind, &liq, &conf, &ms, &cfg,
-                    Some(&cvd), Some(&vol),
+                    c.close,
+                    &ind,
+                    &liq,
+                    &conf,
+                    &ms,
+                    &cfg,
+                    Some(&cvd),
+                    Some(&vol),
                 ));
             }
         });
@@ -206,5 +196,9 @@ criterion_group!(
     bench_engine_hot_bar,
     bench_engine_normal_bar,
 );
-criterion_group!(pipeline_benches, bench_signal_pipeline, bench_streaming_per_bar);
+criterion_group!(
+    pipeline_benches,
+    bench_signal_pipeline,
+    bench_streaming_per_bar
+);
 criterion_main!(engine_benches, pipeline_benches);

@@ -1,5 +1,6 @@
-/// Common test helpers shared across indicator integration tests.
+// Common test helpers shared across indicator integration tests.
 // Not every file in the test suite uses every helper; suppress the noise.
+#![allow(dead_code)]
 
 // ── 30-bar reference dataset ──────────────────────────────────────────────────
 //
@@ -52,7 +53,7 @@ pub fn make_candles(data: &[(f64, f64, f64, f64)]) -> Vec<Candle> {
     data.iter()
         .enumerate()
         .map(|(i, &(h, l, c, v))| Candle {
-            time: i as i64,
+            time: i64::try_from(i).unwrap(),
             open: c,
             high: h,
             low: l,
@@ -68,7 +69,7 @@ pub fn close_candles(closes: &[f64]) -> Vec<Candle> {
         .iter()
         .enumerate()
         .map(|(i, &c)| Candle {
-            time: i as i64,
+            time: i64::try_from(i).unwrap(),
             open: c,
             high: c,
             low: c,
@@ -101,11 +102,10 @@ pub fn assert_all_non_nan<F: Fn(f64) -> bool>(values: &[f64], pred: F, label: &s
 /// Assert the first `n` values of a slice are NaN (warm-up period).
 #[track_caller]
 pub fn assert_leading_nans(values: &[f64], n: usize, label: &str) {
-    for i in 0..n {
+    for (i, &v) in values.iter().enumerate().take(n) {
         assert!(
-            values[i].is_nan(),
-            "{label}[{i}] should be NaN during warm-up, got {}",
-            values[i]
+            v.is_nan(),
+            "{label}[{i}] should be NaN during warm-up, got {v}",
         );
     }
 }
@@ -113,10 +113,7 @@ pub fn assert_leading_nans(values: &[f64], n: usize, label: &str) {
 /// Assert none of the values at or after index `start` are NaN.
 #[track_caller]
 pub fn assert_no_nans_from(values: &[f64], start: usize, label: &str) {
-    for i in start..values.len() {
-        assert!(
-            !values[i].is_nan(),
-            "{label}[{i}] should not be NaN after warm-up"
-        );
+    for (i, &v) in values.iter().enumerate().skip(start) {
+        assert!(!v.is_nan(), "{label}[{i}] should not be NaN after warm-up");
     }
 }

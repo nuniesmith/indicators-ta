@@ -175,7 +175,7 @@ fn cmf_14_first_valid() {
     // Python: cmf.iloc[13] = 0.010866...
     let out = ChaikinMoneyFlow::with_period(14).calculate(&ref_candles()).unwrap();
     let vals = out.get("CMF_14").unwrap();
-    assert_close(vals[13], 0.0108660914, 1e-8, "CMF(14)[13]");
+    assert_close(vals[13], 0.010_866_091_4, 1e-8, "CMF(14)[13]");
 }
 
 #[test]
@@ -183,7 +183,7 @@ fn cmf_14_last_value() {
     // Python: cmf.iloc[29] = -0.024262...
     let out = ChaikinMoneyFlow::with_period(14).calculate(&ref_candles()).unwrap();
     let vals = out.get("CMF_14").unwrap();
-    assert_close(vals[29], -0.0242622951, 1e-8, "CMF(14)[29]");
+    assert_close(vals[29], -0.024_262_295_1, 1e-8, "CMF(14)[29]");
 }
 
 #[test]

@@ -102,7 +102,9 @@ impl Indicator for StructureIndicator {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let swing_len = param_usize(params, "swing_len", 5)?;
     let atr_mult = param_f64(params, "atr_mult", 0.5)?;
     Ok(Box::new(StructureIndicator::new(StructureParams {

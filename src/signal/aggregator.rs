@@ -156,7 +156,9 @@ impl Indicator for SignalIndicator {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let signal_confirm_bars = param_usize(params, "confirm_bars", 3)?;
     Ok(Box::new(SignalIndicator::new(
         IndicatorConfig::default(),

@@ -90,7 +90,9 @@ impl Indicator for LiquidityIndicator {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 50)?;
     let n_bins = param_usize(params, "n_bins", 20)?;
     Ok(Box::new(LiquidityIndicator::new(LiquidityParams {

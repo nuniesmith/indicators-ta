@@ -32,7 +32,7 @@ fn sma_10_known_values() {
     // Python: iloc[9] = 103.75, iloc[29] = 117.05
     let out = Sma::with_period(10).calculate(&ref_candles()).unwrap();
     let vals = out.get("SMA_10").unwrap();
-    assert_close(vals[9],  103.75, EPS, "SMA(10)[9]");
+    assert_close(vals[9], 103.75, EPS, "SMA(10)[9]");
     assert_close(vals[29], 117.05, EPS, "SMA(10)[29]");
 }
 
@@ -52,15 +52,18 @@ fn sma_constant_series_equals_constant() {
     let candles = close_candles(&[42.0_f64; 20]);
     let out = Sma::with_period(5).calculate(&candles).unwrap();
     let vals = out.get("SMA_5").unwrap();
-    for i in 4..20 {
-        assert_close(vals[i], 42.0, EPS, &format!("SMA const[{i}]"));
+    for (i, &v) in vals.iter().enumerate().take(20).skip(4) {
+        assert_close(v, 42.0, EPS, &format!("SMA const[{i}]"));
     }
 }
 
 #[test]
 fn sma_on_high_column() {
     // SMA can operate on the High price column.
-    let params = SmaParams { period: 5, column: PriceColumn::High };
+    let params = SmaParams {
+        period: 5,
+        column: PriceColumn::High,
+    };
     let out = Sma::new(params).calculate(&ref_candles()).unwrap();
     let vals = out.get("SMA_5").unwrap();
     // High[0..5] = [101.5, 103.0, 103.5, 104.5, 105.5] → mean = 103.6
@@ -70,7 +73,9 @@ fn sma_on_high_column() {
 #[test]
 fn sma_insufficient_data_is_error() {
     use indicators::error::IndicatorError;
-    let err = Sma::with_period(10).calculate(&close_candles(&[1.0; 5])).unwrap_err();
+    let err = Sma::with_period(10)
+        .calculate(&close_candles(&[1.0; 5]))
+        .unwrap_err();
     assert!(matches!(err, IndicatorError::InsufficientData { .. }));
 }
 
@@ -124,7 +129,8 @@ fn wma_greater_than_sma_on_uptrend() {
         assert!(
             wma_vals[i] > sma_vals[i],
             "WMA[{i}]={} should exceed SMA[{i}]={} on uptrend",
-            wma_vals[i], sma_vals[i]
+            wma_vals[i],
+            sma_vals[i]
         );
     }
 }
@@ -134,8 +140,8 @@ fn wma_constant_series_equals_constant() {
     let candles = close_candles(&[55.0_f64; 15]);
     let out = Wma::with_period(5).calculate(&candles).unwrap();
     let vals = out.get("WMA_5").unwrap();
-    for i in 4..15 {
-        assert_close(vals[i], 55.0, EPS, &format!("WMA const[{i}]"));
+    for (i, &v) in vals.iter().enumerate().take(15).skip(4) {
+        assert_close(v, 55.0, EPS, &format!("WMA const[{i}]"));
     }
 }
 
@@ -145,12 +151,19 @@ fn wma_period3_hand_computed() {
     // wma = (1*10 + 2*20 + 3*30) / 6 = (10+40+90)/6 = 140/6 = 23.333...
     let candles = close_candles(&[10.0, 20.0, 30.0]);
     let out = Wma::with_period(3).calculate(&candles).unwrap();
-    assert_close(out.get("WMA_3").unwrap()[2], 140.0 / 6.0, EPS, "WMA(3) hand");
+    assert_close(
+        out.get("WMA_3").unwrap()[2],
+        140.0 / 6.0,
+        EPS,
+        "WMA(3) hand",
+    );
 }
 
 #[test]
 fn wma_insufficient_data_is_error() {
     use indicators::error::IndicatorError;
-    let err = Wma::with_period(10).calculate(&close_candles(&[1.0; 3])).unwrap_err();
+    let err = Wma::with_period(10)
+        .calculate(&close_candles(&[1.0; 3]))
+        .unwrap_err();
     assert!(matches!(err, IndicatorError::InsufficientData { .. }));
 }

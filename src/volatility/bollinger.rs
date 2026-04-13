@@ -143,7 +143,9 @@ impl Indicator for BollingerBands {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     let period = param_usize(params, "period", 20)?;
     let std_dev = param_f64(params, "std_dev", 2.0)?;
     let column = match param_str(params, "column", "close") {

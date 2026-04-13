@@ -161,7 +161,9 @@ fn sma_of(src: &[f64], period: usize) -> Vec<f64> {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(StochasticRsi::new(StochRsiParams {
         rsi_period: param_usize(params, "rsi_period", 14)?,
         stoch_period: param_usize(params, "stoch_period", 14)?,

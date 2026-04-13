@@ -123,7 +123,9 @@ impl Indicator for KeltnerChannels {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-pub fn factory<S: ::std::hash::BuildHasher>(params: &HashMap<String, String, S>) -> Result<Box<dyn Indicator>, IndicatorError> {
+pub fn factory<S: ::std::hash::BuildHasher>(
+    params: &HashMap<String, String, S>,
+) -> Result<Box<dyn Indicator>, IndicatorError> {
     Ok(Box::new(KeltnerChannels::new(KeltnerParams {
         period: param_usize(params, "period", 20)?,
         multiplier: param_f64(params, "multiplier", 2.0)?,
