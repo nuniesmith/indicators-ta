@@ -1,3 +1,7 @@
+// Numeric tests index slices directly (and use the index in assert messages),
+// which reads clearer than enumerate() here.
+#![allow(clippy::needless_range_loop)]
+
 /// End-to-end tests for the full `compute_signal` pipeline.
 ///
 /// Covers:
@@ -8,8 +12,9 @@
 mod common;
 
 use indicators::{
-    ConfluenceEngine, IndicatorConfig, Indicators, LiquidityProfile, MarketStructure,
-    SignalIndicator, SignalStreak, compute_signal, indicator::Indicator, signal::cvd::CVDTracker,
+    ConfluenceEngine, ConfluenceParams, CvdParams, IndicatorConfig, Indicators, LiquidityParams,
+    LiquidityProfile, MarketStructure, SignalIndicator, SignalStreak, StructureParams,
+    compute_signal, indicator::Indicator, signal::cvd::CVDTracker,
     signal::vol_regime::VolatilityPercentile, types::Candle,
 };
 
@@ -24,7 +29,7 @@ fn rising_candles(n: usize, base: f64) -> Vec<Candle> {
         .map(|i| {
             let c = base + i as f64 * 0.5;
             Candle {
-                time: i as i64 * 60_000, // 1-minute bars, same UTC date
+                time: i64::try_from(i).unwrap() * 60_000, // 1-minute bars, same UTC date
                 open: c - 0.2,
                 high: c + 0.3,
                 low: c - 0.3,
@@ -41,7 +46,7 @@ fn falling_candles(n: usize, base: f64) -> Vec<Candle> {
         .map(|i| {
             let c = base - i as f64 * 0.5;
             Candle {
-                time: i as i64 * 60_000,
+                time: i64::try_from(i).unwrap() * 60_000,
                 open: c + 0.2,
                 high: c + 0.3,
                 low: c - 0.3,
@@ -289,10 +294,10 @@ fn any_mode_fires_at_least_one_long_signal_on_uptrend() {
             signal_confirm_bars: 1,
             ..IndicatorConfig::default()
         },
-        conf_params: Default::default(),
-        liq_params: Default::default(),
-        struct_params: Default::default(),
-        cvd_params: Default::default(),
+        conf_params: ConfluenceParams::default(),
+        liq_params: LiquidityParams::default(),
+        struct_params: StructureParams::default(),
+        cvd_params: CvdParams::default(),
         signal_confirm_bars: 1,
     };
 
@@ -315,10 +320,10 @@ fn any_mode_fires_at_least_one_short_signal_on_downtrend() {
             signal_confirm_bars: 1,
             ..IndicatorConfig::default()
         },
-        conf_params: Default::default(),
-        liq_params: Default::default(),
-        struct_params: Default::default(),
-        cvd_params: Default::default(),
+        conf_params: ConfluenceParams::default(),
+        liq_params: LiquidityParams::default(),
+        struct_params: StructureParams::default(),
+        cvd_params: CvdParams::default(),
         signal_confirm_bars: 1,
     };
 
