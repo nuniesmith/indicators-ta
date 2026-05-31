@@ -336,6 +336,82 @@ impl IndicatorCalculator {
     }
 }
 
+/// Incremental EMA — O(1) update per tick that returns the new value each call.
+///
+/// Unlike [`EMA`] (which separates `update` from `value`/`is_ready`), this
+/// seeds from the first sample and returns the EMA on every `update`, which
+/// suits streaming pipelines that consume the value inline.
+pub struct IncrementalEma {
+    alpha: f64,
+    state: f64,
+    initialized: bool,
+}
+
+impl IncrementalEma {
+    /// Create an incremental EMA for the given period.
+    pub fn new(period: usize) -> Self {
+        Self {
+            alpha: 2.0 / (period as f64 + 1.0),
+            state: 0.0,
+            initialized: false,
+        }
+    }
+
+    /// Feed the next price; returns the updated EMA (seeds from the first price).
+    pub fn update(&mut self, price: f64) -> f64 {
+        if !self.initialized {
+            self.state = price;
+            self.initialized = true;
+        } else {
+            self.state = self.alpha * price + (1.0 - self.alpha) * self.state;
+        }
+        self.state
+    }
+
+    /// Current EMA value, or `None` before the first `update`.
+    pub fn current(&self) -> Option<f64> {
+        if self.initialized {
+            Some(self.state)
+        } else {
+            None
+        }
+    }
+}
+
+/// Incremental ATR — O(1) per-tick true-range EMA.
+///
+/// Wraps an [`IncrementalEma`] over the true range and returns the smoothed
+/// ATR on each `update`. The first sample's true range is `high - low`.
+pub struct IncrementalAtr {
+    ema: IncrementalEma,
+    prev_close: Option<f64>,
+}
+
+impl IncrementalAtr {
+    /// Create an incremental ATR for the given period.
+    pub fn new(period: usize) -> Self {
+        Self {
+            ema: IncrementalEma::new(period),
+            prev_close: None,
+        }
+    }
+
+    /// Feed the next high/low/close; returns the updated ATR.
+    pub fn update(&mut self, high: f64, low: f64, close: f64) -> Option<f64> {
+        let tr = if let Some(prev) = self.prev_close {
+            let tr1 = high - low;
+            let tr2 = (high - prev).abs();
+            let tr3 = (low - prev).abs();
+            tr1.max(tr2).max(tr3)
+        } else {
+            high - low
+        };
+
+        self.prev_close = Some(close);
+        Some(self.ema.update(tr))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -368,5 +444,22 @@ mod tests {
         e.update(30.0);
         assert!(e.is_ready());
         assert!((e.value() - 20.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_incremental_ema_returns_value() {
+        let mut e = IncrementalEma::new(3); // alpha = 0.5
+        assert_eq!(e.current(), None);
+        assert_eq!(e.update(10.0), 10.0); // seeds from first sample
+        assert_eq!(e.current(), Some(10.0));
+        let v = e.update(20.0); // 0.5*20 + 0.5*10
+        assert!((v - 15.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_incremental_atr_first_is_range() {
+        let mut a = IncrementalAtr::new(3);
+        // First sample: TR = high - low, EMA seeds to it.
+        assert_eq!(a.update(12.0, 10.0, 11.0), Some(2.0));
     }
 }
