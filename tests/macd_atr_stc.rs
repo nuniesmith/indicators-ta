@@ -1,3 +1,7 @@
+// Numeric tests index slices directly (and use the index in assert messages),
+// which reads clearer than enumerate() here.
+#![allow(clippy::needless_range_loop)]
+
 mod common;
 use common::*;
 
