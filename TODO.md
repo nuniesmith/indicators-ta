@@ -1,0 +1,67 @@
+# indicators-ta — TODO / Roadmap
+
+> Technical-analysis indicators + market-regime detection. Published on
+> crates.io (**0.1.5**), imported as `indicators`. Consumed by **janus**
+> (its TA crate, post-consolidation) and by the **fks-full** bots
+> (`crypto-demo`). Part of the FKS stack — see
+> [`fks-full/docs/MULTI_ASSET_BRAIN_ROADMAP.md`](https://github.com/nuniesmith/fks-full/blob/main/docs/MULTI_ASSET_BRAIN_ROADMAP.md).
+
+## Where things stand (2026-06, v0.1.5)
+
+A broad, tested indicator library: `trend` (EMA/SMA/WMA/MACD/linear-regression/
+parabolic-SAR), `momentum` (RSI/Stochastic/StochasticRSI/Williams %R/STC),
+`volatility` (Bollinger/Keltner/Choppiness/Elder-Ray/market-cycle), `volume`
+(ADL/CMF/VZO), an 11-layer `signal` engine (VWAP/confluence/liquidity/structure/
+CVD/…), and `regime` detection (indicator + HMM + ensemble + strategy router).
+Batch functions over slices **plus** incremental O(1) structs (`EMA`/`ATR`/
+`IncrementalEma`/`IncrementalAtr`) for streaming. ~357 tests; CI gates
+fmt/clippy/test/docs/MSRV (1.94.1).
+
+## Recommended next steps (priority order)
+
+1. **Add a `CHANGELOG.md`.** The crate has shipped 0.1.0 → 0.1.5 with no
+   changelog (the 0.1.4/0.1.5 work — incremental EMA/ATR, the `IndicatorError`
+   re-export — is only in git history). Backfill from tags + keep it current.
+   Pairs with docs.rs/crates.io hygiene.
+
+2. **Consumer-driven API requests (from the FKS brain roadmap).** As janus's
+   live loop starts feeding the regime detector and emitting regime/fear
+   (janus TODO P0), expect requests for:
+   - [ ] A streaming/incremental wrapper for the **regime ensemble** (today
+         `EnsembleRegimeDetector::update(h,l,c)` exists — confirm it's a clean
+         per-candle API for the live loop, and that `is_ready()` gating is exposed).
+   - [ ] Incremental variants of the **signal-engine** layers used per-tick
+         (the batch `compute_signal` path is fine for backtests; the live loop
+         wants O(1) updates).
+   - [ ] Confirm every indicator the janus strategy suite uses is present and
+         matches janus's previous `jflow-indicators` numerics (the consolidation
+         relied on name+behaviour parity — keep it that way on future changes).
+
+3. **Quality / supply-chain CI** (mirror exchange-apiws): `cargo-deny`
+   (advisories + licenses), `cargo-semver-checks` against the last published
+   version (catch accidental breaking changes — this crate is a published dep
+   of janus + the bots), optional coverage badge.
+
+4. **`docs.rs` polish.** `package.metadata.docs.rs` with `all-features = true`
+   so the full surface builds on docs.rs; per-module doc examples for the
+   signal engine + regime detectors (the README covers batch indicators well,
+   but the signal/regime APIs are the least-documented).
+
+## Backlog / nice-to-have
+
+- [ ] **Property/fuzz tests** for the numerically-sensitive paths (HMM
+      forward/backward, the signal-engine aggregation, parabolic SAR flips).
+- [ ] **Benchmarks** (`criterion`) for the incremental structs + the signal
+      engine, so the streaming path stays fast as it grows.
+- [ ] **More incremental indicators** as consumers need them (incremental
+      RSI/MACD/Bollinger) — today only EMA/ATR have O(1) streaming structs.
+- [ ] Consider a `no_std`-friendly core for the pure-math functions (only if a
+      consumer ever needs it — not speculative work).
+
+## Done
+
+- v0.1.5 — `IncrementalEma` / `IncrementalAtr` (streaming O(1), return value on
+  each update); root re-export of `IndicatorError`. Made the crate a strict
+  superset of janus's retired `jflow-indicators`, unblocking that consolidation.
+- v0.1.0–0.1.3 — the indicator library + signal engine + regime detection +
+  CI gates. (See git history; backfill into the new CHANGELOG.)
