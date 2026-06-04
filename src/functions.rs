@@ -492,9 +492,130 @@ impl IncrementalMacd {
     }
 }
 
+/// Per-tick Bollinger Bands output (see [`IncrementalBollinger`]).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BollingerBandsValue {
+    /// Middle band — the `period`-SMA.
+    pub middle: f64,
+    /// Upper band — `middle + std_mult * std`.
+    pub upper: f64,
+    /// Lower band — `middle - std_mult * std`.
+    pub lower: f64,
+    /// `(upper - lower) / middle`, or `NaN` when `middle` is 0.
+    pub bandwidth: f64,
+    /// `%b` — `(price - lower) / (upper - lower)`, or `NaN` for a zero-width band.
+    pub percent_b: f64,
+}
+
+/// Incremental Bollinger Bands — per-tick bands over a rolling window.
+///
+/// Mirrors the batch [`BollingerBands`](crate::volatility::BollingerBands):
+/// `middle` is the `period`-SMA, the deviation is the **sample** standard
+/// deviation (ddof = 1) over the window, and `upper`/`lower` are
+/// `middle ± std_mult * std` (2.0 is the common multiplier). Emits `None` until
+/// `period` samples are buffered. Unlike the EMA-based incremental structs this
+/// keeps a `period`-length window, so each `update` is O(period), not O(1).
+#[derive(Debug, Clone)]
+pub struct IncrementalBollinger {
+    window: VecDeque<f64>,
+    period: usize,
+    std_mult: f64,
+}
+
+impl IncrementalBollinger {
+    /// Create incremental Bollinger Bands for the given period and band
+    /// multiplier (`std_mult`, conventionally 2.0).
+    pub fn new(period: usize, std_mult: f64) -> Self {
+        Self {
+            window: VecDeque::with_capacity(period.max(1)),
+            period,
+            std_mult,
+        }
+    }
+
+    /// Feed the next price; returns the bands once `period` samples are buffered
+    /// (and `period >= 2`, so the sample stddev is defined).
+    pub fn update(&mut self, price: f64) -> Option<BollingerBandsValue> {
+        self.window.push_back(price);
+        if self.window.len() > self.period {
+            self.window.pop_front();
+        }
+        if self.window.len() < self.period || self.period < 2 {
+            return None;
+        }
+
+        let mean: f64 = self.window.iter().sum::<f64>() / self.period as f64;
+        // Sample variance (ddof = 1), matching the batch `rolling_std`.
+        let var: f64 =
+            self.window.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (self.period - 1) as f64;
+        let std = var.sqrt();
+
+        let upper = mean + self.std_mult * std;
+        let lower = mean - self.std_mult * std;
+        let bandwidth = if mean == 0.0 {
+            f64::NAN
+        } else {
+            (upper - lower) / mean
+        };
+        let band_range = upper - lower;
+        let percent_b = if band_range == 0.0 {
+            f64::NAN
+        } else {
+            (price - lower) / band_range
+        };
+
+        Some(BollingerBandsValue {
+            middle: mean,
+            upper,
+            lower,
+            bandwidth,
+            percent_b,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_incremental_bollinger_warmup_then_value() {
+        let mut bb = IncrementalBollinger::new(5, 2.0);
+        for p in [10.0, 11.0, 12.0, 13.0] {
+            assert!(bb.update(p).is_none(), "no value before `period` samples");
+        }
+        assert!(bb.update(14.0).is_some(), "value once the window is full");
+    }
+
+    #[test]
+    fn test_incremental_bollinger_constant_prices_zero_width() {
+        let mut bb = IncrementalBollinger::new(4, 2.0);
+        let mut last = None;
+        for _ in 0..4 {
+            last = bb.update(10.0);
+        }
+        let v = last.unwrap();
+        assert!((v.middle - 10.0).abs() < 1e-12);
+        assert!((v.upper - 10.0).abs() < 1e-12);
+        assert!((v.lower - 10.0).abs() < 1e-12);
+        assert!((v.bandwidth - 0.0).abs() < 1e-12);
+        assert!(v.percent_b.is_nan(), "zero-width band → %b undefined");
+    }
+
+    #[test]
+    fn test_incremental_bollinger_matches_sample_stddev() {
+        // window [2,4,4,4,5,5,7,9]: mean 5, sample variance 32/7, std ≈ 2.138.
+        let mut bb = IncrementalBollinger::new(8, 2.0);
+        let mut last = None;
+        for p in [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0] {
+            last = bb.update(p);
+        }
+        let v = last.unwrap();
+        let std = (32.0_f64 / 7.0).sqrt();
+        assert!((v.middle - 5.0).abs() < 1e-9);
+        assert!((v.upper - (5.0 + 2.0 * std)).abs() < 1e-9);
+        assert!((v.lower - (5.0 - 2.0 * std)).abs() < 1e-9);
+    }
 
     #[test]
     fn test_incremental_rsi_first_sample_is_none() {
