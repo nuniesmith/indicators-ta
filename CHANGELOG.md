@@ -12,10 +12,12 @@ and may be coarser than going-forward entries.
 ## [Unreleased]
 
 ### Added
-- **`IncrementalRsi` / `IncrementalMacd`** — O(1) streaming structs (re-exported
-  at the crate root) composed from `IncrementalEma`, mirroring the batch `rsi` /
-  `macd` formulas. Extends the streaming set beyond `IncrementalEma` /
-  `IncrementalAtr`. (`IncrementalBollinger` is still open.)
+- **`IncrementalRsi` / `IncrementalMacd` / `IncrementalBollinger`** — streaming
+  structs (re-exported at the crate root) mirroring the batch `rsi` / `macd` /
+  Bollinger formulas, completing the incremental indicator set alongside
+  `IncrementalEma` / `IncrementalAtr`. RSI/MACD compose from `IncrementalEma`;
+  Bollinger keeps a rolling window and uses the sample stddev (ddof = 1) to
+  match the batch.
 
 ## [0.1.5] - 2026-05-31
 
