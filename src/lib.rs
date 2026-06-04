@@ -22,7 +22,8 @@ pub mod regime;
 
 // ── Re-exports: core ─────────────────────────────────────────────────────────
 pub use functions::{
-    ATR, EMA, IncrementalAtr, IncrementalEma, IndicatorCalculator, StrategyIndicators,
+    ATR, EMA, IncrementalAtr, IncrementalEma, IncrementalMacd, IncrementalRsi, IndicatorCalculator,
+    StrategyIndicators,
 };
 pub use functions::{atr, ema, macd, rsi, sma, true_range};
 pub use indicator::{Indicator, IndicatorOutput, PriceColumn};

@@ -11,7 +11,11 @@ and may be coarser than going-forward entries.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **`IncrementalRsi` / `IncrementalMacd`** — O(1) streaming structs (re-exported
+  at the crate root) composed from `IncrementalEma`, mirroring the batch `rsi` /
+  `macd` formulas. Extends the streaming set beyond `IncrementalEma` /
+  `IncrementalAtr`. (`IncrementalBollinger` is still open.)
 
 ## [0.1.5] - 2026-05-31
 

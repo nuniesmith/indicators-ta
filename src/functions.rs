@@ -341,6 +341,7 @@ impl IndicatorCalculator {
 /// Unlike [`EMA`] (which separates `update` from `value`/`is_ready`), this
 /// seeds from the first sample and returns the EMA on every `update`, which
 /// suits streaming pipelines that consume the value inline.
+#[derive(Debug, Clone)]
 pub struct IncrementalEma {
     alpha: f64,
     state: f64,
@@ -412,9 +413,136 @@ impl IncrementalAtr {
     }
 }
 
+/// Incremental RSI — O(1) per-tick, EMA-smoothed gains/losses.
+///
+/// Mirrors the batch [`rsi`]: the average gain and loss are tracked with an
+/// [`IncrementalEma`] of the given period and combined as
+/// `100 - 100 / (1 + avg_gain / avg_loss)` (RSI is 100 when the average loss is
+/// zero). Like the other incremental structs it seeds from the first sample
+/// (vs. the batch SMA warm-up), so warm-up values differ slightly from [`rsi`]
+/// but converge — both are valid.
+#[derive(Debug, Clone)]
+pub struct IncrementalRsi {
+    gain_ema: IncrementalEma,
+    loss_ema: IncrementalEma,
+    prev_price: Option<f64>,
+}
+
+impl IncrementalRsi {
+    /// Create an incremental RSI for the given period.
+    pub fn new(period: usize) -> Self {
+        Self {
+            gain_ema: IncrementalEma::new(period),
+            loss_ema: IncrementalEma::new(period),
+            prev_price: None,
+        }
+    }
+
+    /// Feed the next price; returns the updated RSI, or `None` for the very
+    /// first sample (RSI needs a prior price to form the first change).
+    pub fn update(&mut self, price: f64) -> Option<f64> {
+        let prev = self.prev_price.replace(price)?;
+        let change = price - prev;
+        let (gain, loss) = if change > 0.0 {
+            (change, 0.0)
+        } else {
+            (0.0, -change)
+        };
+        let avg_gain = self.gain_ema.update(gain);
+        let avg_loss = self.loss_ema.update(loss);
+        let rsi = if avg_loss == 0.0 {
+            100.0
+        } else {
+            let rs = avg_gain / avg_loss;
+            100.0 - 100.0 / (1.0 + rs)
+        };
+        Some(rsi)
+    }
+}
+
+/// Incremental MACD — O(1) per-tick MACD line, signal, and histogram.
+///
+/// Mirrors the batch [`macd`]: a fast and slow [`IncrementalEma`] give the MACD
+/// line (`fast - slow`), a third EMA over that line is the signal, and the
+/// histogram is `macd - signal`. The EMAs seed from the first sample (matching
+/// the batch's `adjust=false` / first-value seeding via `ema_nan_aware`), so
+/// values are emitted from the first tick rather than after a NaN warm-up.
+#[derive(Debug, Clone)]
+pub struct IncrementalMacd {
+    fast: IncrementalEma,
+    slow: IncrementalEma,
+    signal: IncrementalEma,
+}
+
+impl IncrementalMacd {
+    /// Create an incremental MACD from the fast, slow, and signal periods.
+    pub fn new(fast_period: usize, slow_period: usize, signal_period: usize) -> Self {
+        Self {
+            fast: IncrementalEma::new(fast_period),
+            slow: IncrementalEma::new(slow_period),
+            signal: IncrementalEma::new(signal_period),
+        }
+    }
+
+    /// Feed the next price; returns `(macd, signal, histogram)`.
+    pub fn update(&mut self, price: f64) -> (f64, f64, f64) {
+        let macd = self.fast.update(price) - self.slow.update(price);
+        let signal = self.signal.update(macd);
+        (macd, signal, macd - signal)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_incremental_rsi_first_sample_is_none() {
+        let mut rsi = IncrementalRsi::new(14);
+        assert_eq!(rsi.update(10.0), None);
+        assert!(rsi.update(11.0).is_some());
+    }
+
+    #[test]
+    fn test_incremental_rsi_all_gains_saturates_at_100() {
+        let mut rsi = IncrementalRsi::new(14);
+        let mut last = None;
+        for p in [10.0, 11.0, 12.0, 13.0, 14.0, 15.0] {
+            last = rsi.update(p);
+        }
+        // Monotonically rising → average loss is zero → RSI saturates at 100.
+        assert!((last.unwrap() - 100.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_incremental_rsi_stays_in_bounds() {
+        let mut rsi = IncrementalRsi::new(5);
+        let prices = [44.0, 44.3, 44.1, 44.2, 43.6, 44.3, 44.8, 45.0, 44.7, 44.9];
+        let mut produced = 0;
+        for p in prices {
+            if let Some(v) = rsi.update(p) {
+                assert!((0.0..=100.0).contains(&v), "RSI out of bounds: {v}");
+                produced += 1;
+            }
+        }
+        assert_eq!(produced, prices.len() - 1);
+    }
+
+    #[test]
+    fn test_incremental_macd_composes_like_batch() {
+        let mut m = IncrementalMacd::new(12, 26, 9);
+        let mut fast = IncrementalEma::new(12);
+        let mut slow = IncrementalEma::new(26);
+        let mut sig = IncrementalEma::new(9);
+        for p in [10.0, 11.0, 10.5, 12.0, 13.0, 12.5, 11.0, 11.5] {
+            let (macd, signal, hist) = m.update(p);
+            let expect_macd = fast.update(p) - slow.update(p);
+            let expect_sig = sig.update(expect_macd);
+            assert!((macd - expect_macd).abs() < 1e-12);
+            assert!((signal - expect_sig).abs() < 1e-12);
+            assert!((hist - (expect_macd - expect_sig)).abs() < 1e-12);
+        }
+    }
 
     #[test]
     fn test_ema_sma_seed() {

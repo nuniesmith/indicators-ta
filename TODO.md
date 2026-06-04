@@ -57,8 +57,10 @@ fmt/clippy/test/docs/MSRV (1.94.1).
       forward/backward, the signal-engine aggregation, parabolic SAR flips).
 - [ ] **Benchmarks** (`criterion`) for the incremental structs + the signal
       engine, so the streaming path stays fast as it grows.
-- [ ] **More incremental indicators** as consumers need them (incremental
-      RSI/MACD/Bollinger) — today only EMA/ATR have O(1) streaming structs.
+- [x] **More incremental indicators** — `IncrementalRsi` + `IncrementalMacd`
+      added (compose from `IncrementalEma`, mirror the batch `rsi`/`macd`).
+      `IncrementalBollinger` remains (needs a rolling window + the volatility
+      module's stddev convention).
 - [ ] Consider a `no_std`-friendly core for the pure-math functions (only if a
       consumer ever needs it — not speculative work).
 
