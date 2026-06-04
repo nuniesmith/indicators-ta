@@ -19,10 +19,12 @@ fmt/clippy/test/docs/MSRV (1.94.1).
 
 ## Recommended next steps (priority order)
 
-1. **Add a `CHANGELOG.md`.** The crate has shipped 0.1.0 → 0.1.5 with no
-   changelog (the 0.1.4/0.1.5 work — incremental EMA/ATR, the `IndicatorError`
-   re-export — is only in git history). Backfill from tags + keep it current.
-   Pairs with docs.rs/crates.io hygiene.
+1. **✅ `CHANGELOG.md` added** (this PR) — backfilled 0.1.0 → 0.1.5 from git
+   history in Keep-a-Changelog format. The backfill corrected a loose
+   attribution: **0.1.4** is the incremental EMA/ATR release, and **0.1.5** was
+   a test-suite repair + MSRV-CI alignment patch (no API change). Keep it
+   current on each release. Residual: cut git tags (`v0.1.0`…`v0.1.5`) so the
+   `compare` links resolve, and pair with docs.rs/crates.io hygiene.
 
 2. **Consumer-driven API requests (from the FKS brain roadmap).** As janus's
    live loop starts feeding the regime detector and emitting regime/fear
@@ -62,8 +64,10 @@ fmt/clippy/test/docs/MSRV (1.94.1).
 
 ## Done
 
-- v0.1.5 — `IncrementalEma` / `IncrementalAtr` (streaming O(1), return value on
-  each update); root re-export of `IndicatorError`. Made the crate a strict
-  superset of janus's retired `jflow-indicators`, unblocking that consolidation.
+- v0.1.5 — test-suite repair (CI green) + MSRV-CI alignment to 1.94.1
+  (maintenance patch; no API change).
+- v0.1.4 — `IncrementalEma` / `IncrementalAtr` (streaming O(1), return value on
+  each update), re-exported at the crate root. Made the crate a strict superset
+  of janus's retired `jflow-indicators`, unblocking that consolidation.
 - v0.1.0–0.1.3 — the indicator library + signal engine + regime detection +
-  CI gates. (See git history; backfill into the new CHANGELOG.)
+  CI gates. (Now backfilled into `CHANGELOG.md`.)
