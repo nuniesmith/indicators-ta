@@ -37,9 +37,12 @@ fmt/clippy/test/docs/MSRV (1.94.1).
          VolatilityPercentile, SignalStreak each expose an O(1) `update(&candle)`
          (the batch `compute_signal` path remains for backtests). A single wrapper
          bundling all layers is the only residual, if the live loop wants one.
-   - [ ] Confirm every indicator the janus strategy suite uses is present and
-         matches janus's previous `jflow-indicators` numerics (the consolidation
-         relied on name+behaviour parity — keep it that way on future changes).
+   - [x] Confirmed — `tests/consumer_parity.rs` pins the numerics of the exact
+         surface janus consumes (`ema`/`sma`/`rsi`/`macd`/`atr` + the `EMA`/`ATR`
+         incremental structs + `IndicatorCalculator`) with spec-derived golden
+         values + definitional invariants. `jflow-indicators` is retired, so this
+         regression-locks current behaviour rather than cross-checking the old
+         impl — keeping the consolidation stable on future changes.
 
 3. **Quality / supply-chain CI** (mirror exchange-apiws): `cargo-deny`
    (advisories + licenses), `cargo-semver-checks` against the last published
