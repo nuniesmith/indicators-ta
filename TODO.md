@@ -1,10 +1,9 @@
 # indicators-ta — TODO / Roadmap
 
 > Technical-analysis indicators + market-regime detection. Published on
-> crates.io (**0.1.5**), imported as `indicators`. Consumed by **janus**
-> (its TA crate, post-consolidation) and by the **fks-full** bots
-> (`crypto-demo`). Part of the FKS stack — see
-> [`fks-full/docs/MULTI_ASSET_BRAIN_ROADMAP.md`](https://github.com/nuniesmith/fks-full/blob/main/docs/MULTI_ASSET_BRAIN_ROADMAP.md).
+> crates.io (**0.1.5**), imported as `indicators`. A standalone library —
+> downstream consumers (e.g. janus and trading bots) depend on it from
+> crates.io.
 
 ## Where things stand (2026-06, v0.1.5)
 
@@ -26,7 +25,7 @@ fmt/clippy/test/docs/MSRV (1.94.1).
    current on each release. Residual: cut git tags (`v0.1.0`…`v0.1.5`) so the
    `compare` links resolve, and pair with docs.rs/crates.io hygiene.
 
-2. **Consumer-driven API requests (from the FKS brain roadmap).** As janus's
+2. **Consumer-driven API requests.** As janus's
    live loop starts feeding the regime detector and emitting regime/fear
    (janus TODO P0), expect requests for:
    - [x] A streaming/incremental wrapper for the **regime ensemble** — confirmed
