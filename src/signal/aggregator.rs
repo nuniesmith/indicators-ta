@@ -238,12 +238,9 @@ pub fn compute_signal(
     cvd: Option<&CVDTracker>,
     vol: Option<&VolatilityPercentile>,
 ) -> (i32, SignalComponents) {
-    if ind.vwap.is_none() || ind.ema.is_none() || ind.st.is_none() {
+    let (Some(vwap), Some(ema), true) = (ind.vwap, ind.ema, ind.st.is_some()) else {
         return (0, empty_components(ind, liq, conf, ms, cvd, vol));
-    }
-
-    let vwap = ind.vwap.unwrap();
-    let ema = ind.ema.unwrap();
+    };
 
     // ── Layer votes ───────────────────────────────────────────────────────────
     let v1 = if close > vwap { 1_i8 } else { -1 }; // L1 VWAP

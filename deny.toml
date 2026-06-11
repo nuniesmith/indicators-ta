@@ -1,0 +1,27 @@
+# cargo-deny configuration — supply-chain gates for advisories, licenses,
+# duplicate versions, and registry sources.
+# Docs: https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+all-features = true
+
+[advisories]
+yanked = "deny"
+
+[licenses]
+# Everything in the tree (including dev-deps) is satisfiable from this set;
+# extend deliberately rather than loosening to a blanket allow.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Unicode-3.0",
+    "Zlib",
+]
+
+[bans]
+# Duplicate versions bloat compile times but aren't an error for a library.
+multiple-versions = "warn"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

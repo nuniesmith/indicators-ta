@@ -420,18 +420,23 @@ impl Indicators {
         let tr = (candle.high - candle.low)
             .max((candle.high - prev_c).abs())
             .max((candle.low - prev_c).abs());
-        self.rma_atr = Some(rma_step(self.rma_atr, tr, self.cfg.atr_len));
-        self.rma_atr.unwrap()
+        let atr = rma_step(self.rma_atr, tr, self.cfg.atr_len);
+        self.rma_atr = Some(atr);
+        atr
     }
 
     // ── L3 KMeans ─────────────────────────────────────────────────────────────
 
     fn kmeans_atr(&mut self, atr_val: f64) -> f64 {
-        if self.kmeans_centroids.is_none() || (self.bar - self.kmeans_last_bar) >= 10 {
-            self.kmeans_centroids = Some(self.compute_kmeans_centroids());
-            self.kmeans_last_bar = self.bar;
-        }
-        let [c_h, c_m, c_l] = self.kmeans_centroids.unwrap();
+        let [c_h, c_m, c_l] = match self.kmeans_centroids {
+            Some(c) if (self.bar - self.kmeans_last_bar) < 10 => c,
+            _ => {
+                let c = self.compute_kmeans_centroids();
+                self.kmeans_centroids = Some(c);
+                self.kmeans_last_bar = self.bar;
+                c
+            }
+        };
         let dists = [
             (c_h - atr_val).abs(),
             (c_m - atr_val).abs(),
@@ -440,13 +445,16 @@ impl Indicators {
         self.cluster = dists
             .iter()
             .enumerate()
-            .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .min_by(|a, b| a.1.total_cmp(b.1))
             .map_or(1, |(i, _)| i);
         [c_h, c_m, c_l][self.cluster]
     }
 
     fn compute_kmeans_centroids(&self) -> [f64; 3] {
         let n = self.cfg.training_period.min(self.closes.len());
+        if n == 0 {
+            return [0.0; 3];
+        }
         let ha: Vec<f64> = self.highs.iter().rev().take(n).copied().collect();
         let la: Vec<f64> = self.lows.iter().rev().take(n).copied().collect();
         let ca: Vec<f64> = self.closes.iter().rev().take(n).copied().collect();
@@ -484,7 +492,7 @@ impl Indicators {
                 let idx = dists
                     .iter()
                     .enumerate()
-                    .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                    .min_by(|a, b| a.1.total_cmp(b.1))
                     .map_or(1, |(i, _)| i);
                 g[idx].push(v);
             }
@@ -516,9 +524,10 @@ impl Indicators {
     // ── L3 SuperTrend ─────────────────────────────────────────────────────────
 
     fn upd_supertrend(&mut self, adaptive_atr: f64, close: f64) -> (f64, i8) {
-        let hl2 = (self.highs.back().copied().unwrap_or(close)
-            + self.lows.back().copied().unwrap_or(close))
-            / 2.0;
+        let hl2 = f64::midpoint(
+            self.highs.back().copied().unwrap_or(close),
+            self.lows.back().copied().unwrap_or(close),
+        );
         let factor = self.cfg.st_factor;
         let raw_upper = hl2 + factor * adaptive_atr;
         let raw_lower = hl2 - factor * adaptive_atr;
@@ -588,16 +597,16 @@ impl Indicators {
         let accel = delta / max_d;
 
         let alpha = (2.0 / (dyn_len + 1.0) * (1.0 + accel * self.cfg.ts_accel_mult)).min(1.0);
-        self.dyn_ema = Some(match self.dyn_ema {
+        let trend = match self.dyn_ema {
             None => cl,
             Some(prev) => alpha * cl + (1.0 - alpha) * prev,
-        });
+        };
+        self.dyn_ema = Some(trend);
         self.dyn_ema_pub = self.dyn_ema;
 
         self.rma_c = Some(rma_step(self.rma_c, cl, self.cfg.ts_rma_len));
         self.rma_o = Some(rma_step(self.rma_o, op, self.cfg.ts_rma_len));
 
-        let trend = self.dyn_ema.unwrap();
         let prev_cl = self.closes.iter().rev().nth(1).copied().unwrap_or(cl);
         let c_rma = self.rma_c.unwrap_or(0.0);
         let o_rma = self.rma_o.unwrap_or(0.0);

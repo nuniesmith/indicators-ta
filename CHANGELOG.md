@@ -18,6 +18,35 @@ and may be coarser than going-forward entries.
   `IncrementalEma` / `IncrementalAtr`. RSI/MACD compose from `IncrementalEma`;
   Bollinger keeps a rolling window and uses the sample stddev (ddof = 1) to
   match the batch.
+- NaN-robustness regression tests (`tests/nan_robustness.rs`) feeding poisoned
+  candles through the signal engine, liquidity profile, market structure, HMM,
+  regime detector, and ensemble — locking in the panic fixes below.
+- Supply-chain CI: `cargo-deny` (advisories / licenses / sources, see
+  `deny.toml`) and `cargo-semver-checks` (breaking-change detection against the
+  last published release) now gate every PR and the publish job.
+- `[package.metadata.docs.rs] all-features = true` so docs.rs always builds the
+  full surface.
+
+### Fixed
+- **NaN inputs no longer panic the streaming engines.** All
+  `partial_cmp().unwrap()` comparisons (signal-engine KMeans, liquidity POC,
+  HMM state argmax) now use the NaN-safe `f64::total_cmp`; a stale tick or
+  zero-volume bar producing NaN degrades gracefully instead of crashing a live
+  loop. Remaining guarded `unwrap()`s in the regime detector / aggregator /
+  engine were replaced with destructuring that cannot panic, and
+  `compute_kmeans_centroids` no longer indexes into an empty buffer.
+- **`MarketStructure` ATR used swapped Wilder coefficients** — it weighted the
+  current true range at 13/14 and the previous ATR at 1/14 (the reverse of
+  Wilder smoothing, and of the engine's own `rma_step`), making the swing
+  significance filter track raw bar range instead of a smoothed ATR. Now
+  `tr/14 + prev*13/14` as the "Wilder 1/14" comment always intended.
+- Registry no longer panics on a poisoned `RwLock` — it recovers the guard
+  (entries are plain fn-pointer inserts, so no torn state is possible).
+
+### Removed
+- Dropped unused `polars` and `anyhow` dependencies. Neither was referenced
+  anywhere in `src/`; removing them shrinks the resolved dependency graph from
+  154 crates to 21 for every downstream consumer.
 
 ## [0.1.5] - 2026-05-31
 

@@ -181,7 +181,7 @@ impl LiquidityProfile {
         let poc_idx = bins
             .iter()
             .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.total_cmp(b.1))
             .map_or(0, |(i, _)| i);
         self.poc_price = Some(l + step * poc_idx as f64 + step / 2.0);
 

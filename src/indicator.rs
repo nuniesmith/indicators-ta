@@ -184,7 +184,7 @@ impl PriceColumn {
                 PriceColumn::Close => c.close,
                 PriceColumn::Volume => c.volume,
                 PriceColumn::TypicalPrice => (c.high + c.low + c.close) / 3.0,
-                PriceColumn::HL2 => (c.high + c.low) / 2.0,
+                PriceColumn::HL2 => f64::midpoint(c.high, c.low),
             })
             .collect()
     }

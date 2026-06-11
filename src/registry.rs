@@ -20,7 +20,7 @@
 //! ```
 
 use std::collections::HashMap;
-use std::sync::{OnceLock, RwLock};
+use std::sync::{OnceLock, PoisonError, RwLock};
 
 use crate::error::IndicatorError;
 use crate::indicator::Indicator;
@@ -57,7 +57,9 @@ impl IndicatorRegistry {
     ///
     /// Mirrors `IndicatorRegistry.register(indicator_cls)`.
     pub fn register(&self, name: &str, factory: IndicatorFactory) {
-        let mut map = self.entries.write().expect("registry write lock poisoned");
+        // Poison recovery: entries are plain fn-pointer inserts, so a panic in
+        // another thread can't leave the map in a half-written state.
+        let mut map = self.entries.write().unwrap_or_else(PoisonError::into_inner);
         map.insert(name.to_ascii_lowercase(), factory);
     }
 
@@ -65,7 +67,7 @@ impl IndicatorRegistry {
     ///
     /// Mirrors `IndicatorRegistry.list() -> list[str]`.
     pub fn list(&self) -> Vec<String> {
-        let map = self.entries.read().expect("registry read lock poisoned");
+        let map = self.entries.read().unwrap_or_else(PoisonError::into_inner);
         map.keys().cloned().collect()
     }
 
@@ -73,7 +75,7 @@ impl IndicatorRegistry {
     ///
     /// Mirrors `IndicatorRegistry.get(name)`.
     pub fn get(&self, name: &str) -> Option<IndicatorFactory> {
-        let map = self.entries.read().expect("registry read lock poisoned");
+        let map = self.entries.read().unwrap_or_else(PoisonError::into_inner);
         map.get(&name.to_ascii_lowercase()).copied()
     }
 

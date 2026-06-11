@@ -434,16 +434,18 @@ impl HMMRegimeDetector {
 
         self.state_probs = new_probs;
 
-        // Update current state and confidence
+        // Update current state and confidence. total_cmp is NaN-safe: a NaN
+        // probability (numerical blow-up) sorts below all reals instead of
+        // panicking mid-update.
         let (max_idx, max_prob) = self
             .state_probs
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-            .unwrap();
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
+            .map_or((0, 1.0 / n as f64), |(i, p)| (i, *p));
 
         self.current_state = max_idx;
-        self.current_confidence = *max_prob;
+        self.current_confidence = max_prob;
     }
 
     /// Online parameter update using soft assignments
@@ -676,10 +678,10 @@ impl HMMRegimeDetector {
         let (max_idx, max_prob) = next_probs
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-            .unwrap();
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
+            .map_or((0, 0.0), |(i, p)| (i, *p));
 
-        (max_idx, *max_prob)
+        (max_idx, max_prob)
     }
 
     /// Get the total number of observations processed
