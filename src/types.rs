@@ -44,7 +44,7 @@ impl Candle {
 
     /// Mid-price `(H+L)/2`.
     pub fn hl2(&self) -> f64 {
-        (self.high + self.low) / 2.0
+        f64::midpoint(self.high, self.low)
     }
 
     /// True range against an optional previous close.

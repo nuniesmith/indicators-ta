@@ -12,10 +12,11 @@ readme        = "README.md"
 keywords      = ["trading", "technical-analysis", "indicators", "finance", "regime"]
 categories    = ["algorithms", "mathematics", "science"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [dependencies]
-anyhow     = "1.0.102"
 indexmap   = "2"
-polars     = "0.53.0"
 serde      = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono     = { version = "0.4", features = ["serde"] }
@@ -83,9 +84,6 @@ suboptimal_flops = "allow"
 
 # Exact float comparisons in tests compare values we computed ourselves.
 float_cmp = "allow"
-
-# f64::midpoint stabilised in Rust 1.85; our MSRV is 1.82.
-manual_midpoint = "allow"
 
 # Volume accumulation loop — float comparison is the natural idiom.
 while_float = "allow"

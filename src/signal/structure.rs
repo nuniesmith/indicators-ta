@@ -200,17 +200,19 @@ impl MarketStructure {
         self.closes.push_back(candle.close);
 
         // ATR (Wilder 1/14)
-        let prev_c = if self.closes.len() >= 2 {
-            *self.closes.iter().rev().nth(1).unwrap()
-        } else {
-            candle.close
-        };
+        let prev_c = self
+            .closes
+            .iter()
+            .rev()
+            .nth(1)
+            .copied()
+            .unwrap_or(candle.close);
         let tr = (candle.high - candle.low)
             .max((candle.high - prev_c).abs())
             .max((candle.low - prev_c).abs());
         self.atr = Some(match self.atr {
             None => tr,
-            Some(prev) => prev / 14.0 + tr * (1.0 - 1.0 / 14.0),
+            Some(prev) => tr / 14.0 + prev * (1.0 - 1.0 / 14.0),
         });
         let atr = self.atr.unwrap_or(1e-9).max(1e-9);
 

@@ -200,20 +200,25 @@ impl RegimeDetector {
 
         self.last_close = Some(close);
 
-        // Check if we have enough data
+        // Check if we have enough data. The destructure mirrors `is_ready()`
+        // but doesn't rely on it staying in sync — no panic path if an
+        // indicator reports ready while still returning None.
+        let (Some(adx_value), Some(atr_value), Some(bb_values), Some(ema_short), Some(ema_long)) = (
+            adx_value,
+            atr_value,
+            bb_values.as_ref(),
+            ema_short,
+            ema_long,
+        ) else {
+            return RegimeConfidence::new(MarketRegime::Uncertain, 0.0);
+        };
         if !self.is_ready() {
             return RegimeConfidence::new(MarketRegime::Uncertain, 0.0);
         }
 
         // Detect regime
-        let (new_regime, confidence) = self.classify_regime(
-            adx_value.unwrap(),
-            atr_value.unwrap(),
-            bb_values.as_ref().unwrap(),
-            ema_short.unwrap(),
-            ema_long.unwrap(),
-            close,
-        );
+        let (new_regime, confidence) =
+            self.classify_regime(adx_value, atr_value, bb_values, ema_short, ema_long, close);
 
         // Apply stability filter - avoid whipsawing
         let stable_regime = self.apply_stability_filter(new_regime, confidence);
@@ -233,9 +238,9 @@ impl RegimeDetector {
         RegimeConfidence::with_metrics(
             stable_regime,
             confidence,
-            adx_value.unwrap(),
-            bb_values.as_ref().map_or(50.0, |b| b.width_percentile),
-            Self::calculate_trend_strength(ema_short.unwrap(), ema_long.unwrap(), close),
+            adx_value,
+            bb_values.width_percentile,
+            Self::calculate_trend_strength(ema_short, ema_long, close),
         )
     }
 
