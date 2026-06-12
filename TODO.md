@@ -1,11 +1,11 @@
 # indicators-ta — TODO / Roadmap
 
 > Technical-analysis indicators + market-regime detection. Published on
-> crates.io (**0.2.0**), imported as `indicators`. A standalone library —
+> crates.io (**0.2.1**), imported as `indicators`. A standalone library —
 > downstream consumers (e.g. janus and trading bots) depend on it from
 > crates.io.
 
-## Where things stand (2026-06, v0.2.0)
+## Where things stand (2026-06, v0.2.1)
 
 A broad, tested indicator library: `trend` (EMA/SMA/WMA/MACD/linear-regression/
 parabolic-SAR), `momentum` (RSI/Stochastic/StochasticRSI/Williams %R/STC),
@@ -19,7 +19,7 @@ property tests + NaN-robustness regression suites; CI gates fmt/clippy/test/
 docs/MSRV (1.94.1) + cargo-deny + cargo-semver-checks. Lean dependency tree
 (21 crates resolved).
 
-**0.2.0 migration for consumers**: `IncrementalEma::update` and
+**0.2.x migration for consumers** (0.1.5 → 0.2.1; 0.2.0 was never published): `IncrementalEma::update` and
 `IncrementalMacd::update` now return `Option` (always `Some` — wrap call
 sites in `.unwrap()` or `let Some(v) = …`); `IndicatorConfig` gained a
 `#[serde(default)]` `engine` field (tuned JSON loads unchanged).
