@@ -20,6 +20,7 @@ use std::hint::black_box;
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 
 use indicators::{
+    IncrementalAtr, IncrementalBollinger, IncrementalEma, IncrementalMacd, IncrementalRsi,
     IndicatorConfig, IndicatorConfig as Cfg, Indicators, SignalIndicator, compute_signal,
     indicator::Indicator,
     signal::{
@@ -188,6 +189,68 @@ fn bench_streaming_per_bar(c: &mut Criterion) {
     });
 }
 
+// ── Group 5: incremental structs (streaming tick cost) ───────────────────────
+//
+// Per-tick cost of each incremental struct over a 10k-price replay. These are
+// the building blocks of the live loop; this group keeps their O(1) (and the
+// Bollinger O(period)) costs visible as the streaming surface grows.
+
+fn bench_incremental_structs(c: &mut Criterion) {
+    let n = 10_000usize;
+    let prices: Vec<f64> = (0..n)
+        .map(|i| 100.0 + (i as f64 * 0.3).sin() * 5.0 + i as f64 * 0.01)
+        .collect();
+
+    let mut group = c.benchmark_group("incremental_10k_ticks");
+
+    group.bench_function("ema_21", |b| {
+        b.iter(|| {
+            let mut e = IncrementalEma::new(21);
+            for &p in &prices {
+                black_box(e.update(black_box(p)));
+            }
+        });
+    });
+
+    group.bench_function("rsi_14", |b| {
+        b.iter(|| {
+            let mut r = IncrementalRsi::new(14);
+            for &p in &prices {
+                black_box(r.update(black_box(p)));
+            }
+        });
+    });
+
+    group.bench_function("macd_12_26_9", |b| {
+        b.iter(|| {
+            let mut m = IncrementalMacd::new(12, 26, 9);
+            for &p in &prices {
+                black_box(m.update(black_box(p)));
+            }
+        });
+    });
+
+    group.bench_function("bollinger_20", |b| {
+        b.iter(|| {
+            let mut bb = IncrementalBollinger::new(20, 2.0);
+            for &p in &prices {
+                black_box(bb.update(black_box(p)));
+            }
+        });
+    });
+
+    group.bench_function("atr_14", |b| {
+        b.iter(|| {
+            let mut a = IncrementalAtr::new(14);
+            for &p in &prices {
+                black_box(a.update(black_box(p + 0.5), black_box(p - 0.5), black_box(p)));
+            }
+        });
+    });
+
+    group.finish();
+}
+
 // ── Criterion wiring ──────────────────────────────────────────────────────────
 
 criterion_group!(
@@ -201,4 +264,5 @@ criterion_group!(
     bench_signal_pipeline,
     bench_streaming_per_bar
 );
-criterion_main!(engine_benches, pipeline_benches);
+criterion_group!(incremental_benches, bench_incremental_structs);
+criterion_main!(engine_benches, pipeline_benches, incremental_benches);

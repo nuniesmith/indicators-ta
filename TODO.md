@@ -55,10 +55,14 @@ fmt/clippy/test/docs/MSRV (1.94.1).
 
 ## Backlog / nice-to-have
 
-- [ ] **Property/fuzz tests** for the numerically-sensitive paths (HMM
-      forward/backward, the signal-engine aggregation, parabolic SAR flips).
-- [ ] **Benchmarks** (`criterion`) for the incremental structs + the signal
-      engine, so the streaming path stays fast as it grows.
+- [x] **Property/fuzz tests** for the numerically-sensitive paths — present:
+      `tests/property_tests.rs` (proptest) covers HMM state-prob
+      normalisation, parabolic SAR flips, signal aggregation, and the
+      batch/incremental bound invariants.
+- [x] **Benchmarks** (`criterion`) for the incremental structs + the signal
+      engine — `benches/indicators.rs` covers the engine (replay/hot-bar),
+      the full signal pipeline, the per-bar streaming loop, and the
+      `incremental_10k_ticks` group for the streaming structs.
 - [x] **More incremental indicators** — `IncrementalRsi`, `IncrementalMacd`, and
       `IncrementalBollinger` added (mirror the batch `rsi`/`macd`/Bollinger). The
       streaming set now covers EMA / ATR / RSI / MACD / Bollinger.

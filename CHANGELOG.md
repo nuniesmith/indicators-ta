@@ -12,6 +12,19 @@ and may be coarser than going-forward entries.
 ## [Unreleased]
 
 ### Added
+- Property-based tests (`tests/property_tests.rs`, `proptest` dev-dependency)
+  for the numerically sensitive paths: HMM state-probability normalisation,
+  parabolic-SAR hull bounds across flips, signal-engine aggregation vote
+  domain, and bound/ordering/hull invariants for the batch functions and all
+  incremental structs — driven by arbitrary well-formed market data.
+- Criterion benchmark group `incremental_10k_ticks` covering the per-tick cost
+  of `IncrementalEma` / `IncrementalRsi` / `IncrementalMacd` /
+  `IncrementalBollinger` / `IncrementalAtr`, so the streaming path stays fast
+  as it grows.
+- Documented the incremental warm-up contract (a per-struct table in the
+  `functions` module docs): which structs return `Option` vs plain values,
+  when the first defined value appears, and that NaN inputs poison state
+  without panicking.
 - **`IncrementalRsi` / `IncrementalMacd` / `IncrementalBollinger`** — streaming
   structs (re-exported at the crate root) mirroring the batch `rsi` / `macd` /
   Bollinger formulas, completing the incremental indicator set alongside

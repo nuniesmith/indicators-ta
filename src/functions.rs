@@ -2,6 +2,30 @@
 //!
 //! Ported from the original `indicators` crate lib. These work on slices
 //! (batch mode) or as incremental O(1)-per-tick structs.
+//!
+//! # Incremental warm-up contract
+//!
+//! The incremental structs differ in how they signal "not enough data yet";
+//! the rule is that `Option` appears only where a value is genuinely
+//! undefined, while structs whose maths is defined from the first tick return
+//! a plain value:
+//!
+//! | Struct | `update` returns | First defined value |
+//! |---|---|---|
+//! | [`IncrementalEma`] | `f64` | first tick (seeds from it) |
+//! | [`IncrementalAtr`] | `Option<f64>` (currently always `Some`) | first tick (TR = high − low) |
+//! | [`IncrementalRsi`] | `Option<f64>` | second tick (needs a prior price) |
+//! | [`IncrementalMacd`] | `(f64, f64, f64)` | first tick (all EMAs seed from it) |
+//! | [`IncrementalBollinger`] | `Option<BollingerBandsValue>` | after `period` ticks |
+//! | [`EMA`] / [`ATR`] | `()` — read via `value()` / `is_ready()` | after `period` ticks (SMA seed) |
+//!
+//! Early EMA/MACD values are mathematically defined but still converging
+//! toward the batch equivalents (which warm up with an SMA seed or leading
+//! NaN); gate on your own bar count if you need fully-converged values.
+//!
+//! None of these structs validate their inputs: feeding NaN poisons the
+//! internal state (NaN propagates through every subsequent value) without
+//! panicking. Filter non-finite ticks upstream.
 
 use std::collections::VecDeque;
 
