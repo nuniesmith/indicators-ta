@@ -6,9 +6,37 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Engine-internal recompute cadences and iteration caps.
+///
+/// These were hard-coded in the signal engine before 0.2.0. They are not part
+/// of the Python `SETTINGS` dict; `#[serde(default)]` on the parent field
+/// means existing tuned JSON files load unchanged.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SignalEngineConfig {
+    /// Recompute the KMeans ATR centroids every N bars (L3 SuperTrend).
+    pub kmeans_recompute_bars: usize,
+    /// Maximum Lloyd iterations per KMeans centroid fit.
+    pub kmeans_max_iters: usize,
+    /// Recompute the Hurst exponent every N bars (L10).
+    pub hurst_recompute_bars: usize,
+}
+
+impl Default for SignalEngineConfig {
+    fn default() -> Self {
+        Self {
+            kmeans_recompute_bars: 10,
+            kmeans_max_iters: 100,
+            hurst_recompute_bars: 10,
+        }
+    }
+}
+
 /// All tunable parameters that live inside indicators and `compute_signal`.
-/// Every field maps 1-to-1 to a key in the Python `SETTINGS` dict so
-/// Optuna-tuned JSON files load with zero field renaming.
+///
+/// Every field except [`engine`](Self::engine) maps 1-to-1 to a key in the
+/// Python `SETTINGS` dict so Optuna-tuned JSON files load with zero field
+/// renaming (`engine` is additive and defaults when absent).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndicatorConfig {
     // ── Engine Buffer ────────────────────────────────────────────────────────
@@ -77,6 +105,10 @@ pub struct IndicatorConfig {
     // ── Entry gates ──────────────────────────────────────────────────────────
     pub min_vol_pct: f64,
     pub min_hold_candles: usize,
+
+    // ── Engine internals (not in the Python SETTINGS dict) ───────────────────
+    #[serde(default)]
+    pub engine: SignalEngineConfig,
 }
 
 impl Default for IndicatorConfig {
@@ -121,6 +153,7 @@ impl Default for IndicatorConfig {
             stop_atr_mult: 1.5,
             min_vol_pct: 0.20,
             min_hold_candles: 2,
+            engine: SignalEngineConfig::default(),
         }
     }
 }
@@ -132,6 +165,17 @@ mod tests {
     #[test]
     fn default_signal_mode_is_majority() {
         assert_eq!(IndicatorConfig::default().signal_mode, "majority");
+    }
+
+    #[test]
+    fn json_without_engine_block_still_loads() {
+        // Tuned JSON files predate `engine`; it must default when absent.
+        let mut json = serde_json::to_value(IndicatorConfig::default()).unwrap();
+        json.as_object_mut().unwrap().remove("engine");
+        let cfg: IndicatorConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(cfg.engine.kmeans_recompute_bars, 10);
+        assert_eq!(cfg.engine.kmeans_max_iters, 100);
+        assert_eq!(cfg.engine.hurst_recompute_bars, 10);
     }
 
     #[test]

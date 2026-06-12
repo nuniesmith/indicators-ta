@@ -1,6 +1,6 @@
 [package]
 name          = "indicators-ta"
-version       = "0.1.5"
+version       = "0.2.0"
 edition       = "2024"
 authors       = ["nuniesmith"]
 license       = "MIT"
@@ -24,6 +24,7 @@ chrono     = { version = "0.4", features = ["serde"] }
 [dev-dependencies]
 rand      = "0.10.0"
 criterion = { version = "0.8.2", features = ["html_reports"] }
+proptest  = "1"
 
 [[bench]]
 name    = "indicators"

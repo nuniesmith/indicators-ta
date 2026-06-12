@@ -429,7 +429,11 @@ impl Indicators {
 
     fn kmeans_atr(&mut self, atr_val: f64) -> f64 {
         let [c_h, c_m, c_l] = match self.kmeans_centroids {
-            Some(c) if (self.bar - self.kmeans_last_bar) < 10 => c,
+            Some(c)
+                if (self.bar - self.kmeans_last_bar) < self.cfg.engine.kmeans_recompute_bars =>
+            {
+                c
+            }
             _ => {
                 let c = self.compute_kmeans_centroids();
                 self.kmeans_centroids = Some(c);
@@ -485,7 +489,7 @@ impl Indicators {
         let mut c_m = lo + rng * self.cfg.midvol_pct;
         let mut c_l = lo + rng * self.cfg.lowvol_pct;
 
-        for _ in 0..100 {
+        for _ in 0..self.cfg.engine.kmeans_max_iters {
             let mut g: [Vec<f64>; 3] = [Vec::new(), Vec::new(), Vec::new()];
             for &v in &atr_w {
                 let dists = [(v - c_h).abs(), (v - c_m).abs(), (v - c_l).abs()];
@@ -747,7 +751,9 @@ impl Indicators {
     fn upd_hurst(&mut self) {
         let lb = self.cfg.hurst_lookback;
         let min_bars = lb * 2 + 1;
-        if self.closes.len() < min_bars || (self.bar - self.hurst_last_bar) < 10 {
+        if self.closes.len() < min_bars
+            || (self.bar - self.hurst_last_bar) < self.cfg.engine.hurst_recompute_bars
+        {
             return;
         }
         // Skip the O(N log N) R/S loop when the close has barely moved since

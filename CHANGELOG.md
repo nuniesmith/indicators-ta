@@ -11,7 +11,39 @@ and may be coarser than going-forward entries.
 
 ## [Unreleased]
 
+The next release is **0.2.0** (breaking).
+
+### Changed (breaking)
+- **Unified the incremental warm-up contract**: every `Incremental*` struct's
+  `update` now returns `Option<T>` — `None` strictly means "no value defined
+  yet". `IncrementalEma::update` changed from `f64` to `Option<f64>` and
+  `IncrementalMacd::update` from `(f64, f64, f64)` to
+  `Option<(f64, f64, f64)>` (both always `Some`, since their EMAs seed from
+  the first tick — the change is signature-level so all five structs share one
+  consumer pattern, and leaves room to gate warm-up later without another
+  break). Numerics are unchanged.
+- **`IndicatorConfig` gained an `engine: SignalEngineConfig` field** holding
+  the previously hard-coded signal-engine internals: KMeans recompute cadence
+  (10 bars), KMeans iteration cap (100), and Hurst recompute cadence (10
+  bars). The field is `#[serde(default)]`, so existing tuned JSON files load
+  unchanged; only exhaustive struct-literal construction breaks. Defaults
+  reproduce the old behaviour exactly.
+- Dependency removals below (`polars`/`anyhow`) are also part of this bump.
+
 ### Added
+- Property-based tests (`tests/property_tests.rs`, `proptest` dev-dependency)
+  for the numerically sensitive paths: HMM state-probability normalisation,
+  parabolic-SAR hull bounds across flips, signal-engine aggregation vote
+  domain, and bound/ordering/hull invariants for the batch functions and all
+  incremental structs — driven by arbitrary well-formed market data.
+- Criterion benchmark group `incremental_10k_ticks` covering the per-tick cost
+  of `IncrementalEma` / `IncrementalRsi` / `IncrementalMacd` /
+  `IncrementalBollinger` / `IncrementalAtr`, so the streaming path stays fast
+  as it grows.
+- Documented the incremental warm-up contract (a per-struct table in the
+  `functions` module docs): which structs return `Option` vs plain values,
+  when the first defined value appears, and that NaN inputs poison state
+  without panicking.
 - **`IncrementalRsi` / `IncrementalMacd` / `IncrementalBollinger`** — streaming
   structs (re-exported at the crate root) mirroring the batch `rsi` / `macd` /
   Bollinger formulas, completing the incremental indicator set alongside
