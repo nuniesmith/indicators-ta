@@ -5,17 +5,17 @@
 //!
 //! # Incremental warm-up contract
 //!
-//! The incremental structs differ in how they signal "not enough data yet";
-//! the rule is that `Option` appears only where a value is genuinely
-//! undefined, while structs whose maths is defined from the first tick return
-//! a plain value:
+//! Every `Incremental*` struct has the same `update` shape: it returns
+//! `Option<T>`, where `None` means "no value is defined yet". Structs whose
+//! maths seeds from the first tick (EMA, ATR, MACD) return `Some` from the
+//! first call; the others return `None` until their warm-up completes:
 //!
-//! | Struct | `update` returns | First defined value |
+//! | Struct | `update` returns | First `Some` |
 //! |---|---|---|
-//! | [`IncrementalEma`] | `f64` | first tick (seeds from it) |
-//! | [`IncrementalAtr`] | `Option<f64>` (currently always `Some`) | first tick (TR = high − low) |
+//! | [`IncrementalEma`] | `Option<f64>` | first tick (seeds from it) |
+//! | [`IncrementalAtr`] | `Option<f64>` | first tick (TR = high − low) |
 //! | [`IncrementalRsi`] | `Option<f64>` | second tick (needs a prior price) |
-//! | [`IncrementalMacd`] | `(f64, f64, f64)` | first tick (all EMAs seed from it) |
+//! | [`IncrementalMacd`] | `Option<(f64, f64, f64)>` | first tick (all EMAs seed from it) |
 //! | [`IncrementalBollinger`] | `Option<BollingerBandsValue>` | after `period` ticks |
 //! | [`EMA`] / [`ATR`] | `()` — read via `value()` / `is_ready()` | after `period` ticks (SMA seed) |
 //!
@@ -382,8 +382,15 @@ impl IncrementalEma {
         }
     }
 
-    /// Feed the next price; returns the updated EMA (seeds from the first price).
-    pub fn update(&mut self, price: f64) -> f64 {
+    /// Feed the next price; returns the updated EMA. Always `Some` — the EMA
+    /// seeds from the first price — but `Option`-shaped to match the warm-up
+    /// contract shared by all incremental structs.
+    pub fn update(&mut self, price: f64) -> Option<f64> {
+        Some(self.step(price))
+    }
+
+    /// Internal non-optional update for composing structs (RSI, MACD, ATR).
+    fn step(&mut self, price: f64) -> f64 {
         if !self.initialized {
             self.state = price;
             self.initialized = true;
@@ -433,7 +440,7 @@ impl IncrementalAtr {
         };
 
         self.prev_close = Some(close);
-        Some(self.ema.update(tr))
+        Some(self.ema.step(tr))
     }
 }
 
@@ -472,8 +479,8 @@ impl IncrementalRsi {
         } else {
             (0.0, -change)
         };
-        let avg_gain = self.gain_ema.update(gain);
-        let avg_loss = self.loss_ema.update(loss);
+        let avg_gain = self.gain_ema.step(gain);
+        let avg_loss = self.loss_ema.step(loss);
         let rsi = if avg_loss == 0.0 {
             100.0
         } else {
@@ -508,11 +515,13 @@ impl IncrementalMacd {
         }
     }
 
-    /// Feed the next price; returns `(macd, signal, histogram)`.
-    pub fn update(&mut self, price: f64) -> (f64, f64, f64) {
-        let macd = self.fast.update(price) - self.slow.update(price);
-        let signal = self.signal.update(macd);
-        (macd, signal, macd - signal)
+    /// Feed the next price; returns `(macd, signal, histogram)`. Always `Some`
+    /// — every EMA seeds from the first price — but `Option`-shaped to match
+    /// the warm-up contract shared by all incremental structs.
+    pub fn update(&mut self, price: f64) -> Option<(f64, f64, f64)> {
+        let macd = self.fast.step(price) - self.slow.step(price);
+        let signal = self.signal.step(macd);
+        Some((macd, signal, macd - signal))
     }
 }
 
@@ -680,9 +689,9 @@ mod tests {
         let mut slow = IncrementalEma::new(26);
         let mut sig = IncrementalEma::new(9);
         for p in [10.0, 11.0, 10.5, 12.0, 13.0, 12.5, 11.0, 11.5] {
-            let (macd, signal, hist) = m.update(p);
-            let expect_macd = fast.update(p) - slow.update(p);
-            let expect_sig = sig.update(expect_macd);
+            let (macd, signal, hist) = m.update(p).unwrap();
+            let expect_macd = fast.update(p).unwrap() - slow.update(p).unwrap();
+            let expect_sig = sig.update(expect_macd).unwrap();
             assert!((macd - expect_macd).abs() < 1e-12);
             assert!((signal - expect_sig).abs() < 1e-12);
             assert!((hist - (expect_macd - expect_sig)).abs() < 1e-12);
@@ -723,9 +732,9 @@ mod tests {
     fn test_incremental_ema_returns_value() {
         let mut e = IncrementalEma::new(3); // alpha = 0.5
         assert_eq!(e.current(), None);
-        assert_eq!(e.update(10.0), 10.0); // seeds from first sample
+        assert_eq!(e.update(10.0), Some(10.0)); // seeds from first sample
         assert_eq!(e.current(), Some(10.0));
-        let v = e.update(20.0); // 0.5*20 + 0.5*10
+        let v = e.update(20.0).unwrap(); // 0.5*20 + 0.5*10
         assert!((v - 15.0).abs() < 1e-9);
     }
 

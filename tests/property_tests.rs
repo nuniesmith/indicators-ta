@@ -116,7 +116,7 @@ proptest! {
         for &p in &ps {
             lo = lo.min(p);
             hi = hi.max(p);
-            let v = e.update(p);
+            let v = e.update(p).unwrap();
             prop_assert!(v >= lo - 1e-9 && v <= hi + 1e-9,
                 "ema {v} escaped input hull [{lo}, {hi}]");
         }
@@ -136,7 +136,7 @@ proptest! {
     fn incremental_macd_finite_and_consistent(ps in prices(1, 300)) {
         let mut m = IncrementalMacd::new(12, 26, 9);
         for &p in &ps {
-            let (line, signal, hist) = m.update(p);
+            let (line, signal, hist) = m.update(p).unwrap();
             prop_assert!(line.is_finite() && signal.is_finite() && hist.is_finite());
             prop_assert!((hist - (line - signal)).abs() <= 1e-6 * hist.abs().max(1.0));
         }

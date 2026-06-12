@@ -27,7 +27,7 @@ pub use functions::{
 };
 pub use functions::{atr, ema, macd, rsi, sma, true_range};
 pub use indicator::{Indicator, IndicatorOutput, PriceColumn};
-pub use indicator_config::IndicatorConfig;
+pub use indicator_config::{IndicatorConfig, SignalEngineConfig};
 // IndexMap backs IndicatorOutput::into_inner(); re-exported so callers don't
 // need a direct `indexmap` dependency in their Cargo.toml.
 pub use indexmap::IndexMap;

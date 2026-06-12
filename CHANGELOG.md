@@ -11,6 +11,25 @@ and may be coarser than going-forward entries.
 
 ## [Unreleased]
 
+The next release is **0.2.0** (breaking).
+
+### Changed (breaking)
+- **Unified the incremental warm-up contract**: every `Incremental*` struct's
+  `update` now returns `Option<T>` — `None` strictly means "no value defined
+  yet". `IncrementalEma::update` changed from `f64` to `Option<f64>` and
+  `IncrementalMacd::update` from `(f64, f64, f64)` to
+  `Option<(f64, f64, f64)>` (both always `Some`, since their EMAs seed from
+  the first tick — the change is signature-level so all five structs share one
+  consumer pattern, and leaves room to gate warm-up later without another
+  break). Numerics are unchanged.
+- **`IndicatorConfig` gained an `engine: SignalEngineConfig` field** holding
+  the previously hard-coded signal-engine internals: KMeans recompute cadence
+  (10 bars), KMeans iteration cap (100), and Hurst recompute cadence (10
+  bars). The field is `#[serde(default)]`, so existing tuned JSON files load
+  unchanged; only exhaustive struct-literal construction breaks. Defaults
+  reproduce the old behaviour exactly.
+- Dependency removals below (`polars`/`anyhow`) are also part of this bump.
+
 ### Added
 - Property-based tests (`tests/property_tests.rs`, `proptest` dev-dependency)
   for the numerically sensitive paths: HMM state-probability normalisation,
