@@ -1,20 +1,28 @@
 # indicators-ta — TODO / Roadmap
 
 > Technical-analysis indicators + market-regime detection. Published on
-> crates.io (**0.1.5**), imported as `indicators`. A standalone library —
+> crates.io (**0.2.0**), imported as `indicators`. A standalone library —
 > downstream consumers (e.g. janus and trading bots) depend on it from
 > crates.io.
 
-## Where things stand (2026-06, v0.1.5)
+## Where things stand (2026-06, v0.2.0)
 
 A broad, tested indicator library: `trend` (EMA/SMA/WMA/MACD/linear-regression/
 parabolic-SAR), `momentum` (RSI/Stochastic/StochasticRSI/Williams %R/STC),
 `volatility` (Bollinger/Keltner/Choppiness/Elder-Ray/market-cycle), `volume`
 (ADL/CMF/VZO), an 11-layer `signal` engine (VWAP/confluence/liquidity/structure/
 CVD/…), and `regime` detection (indicator + HMM + ensemble + strategy router).
-Batch functions over slices **plus** incremental O(1) structs (`EMA`/`ATR`/
-`IncrementalEma`/`IncrementalAtr`) for streaming. ~357 tests; CI gates
-fmt/clippy/test/docs/MSRV (1.94.1).
+Batch functions over slices **plus** incremental streaming structs with a
+unified `update → Option<T>` warm-up contract (EMA/ATR/RSI/MACD/Bollinger).
+NaN-hardened hot paths (no panicking float comparisons), 394 tests incl.
+property tests + NaN-robustness regression suites; CI gates fmt/clippy/test/
+docs/MSRV (1.94.1) + cargo-deny + cargo-semver-checks. Lean dependency tree
+(21 crates resolved).
+
+**0.2.0 migration for consumers**: `IncrementalEma::update` and
+`IncrementalMacd::update` now return `Option` (always `Some` — wrap call
+sites in `.unwrap()` or `let Some(v) = …`); `IndicatorConfig` gained a
+`#[serde(default)]` `engine` field (tuned JSON loads unchanged).
 
 ## Recommended next steps (priority order)
 
@@ -22,8 +30,10 @@ fmt/clippy/test/docs/MSRV (1.94.1).
    history in Keep-a-Changelog format. The backfill corrected a loose
    attribution: **0.1.4** is the incremental EMA/ATR release, and **0.1.5** was
    a test-suite repair + MSRV-CI alignment patch (no API change). Keep it
-   current on each release. Residual: cut git tags (`v0.1.0`…`v0.1.5`) so the
-   `compare` links resolve, and pair with docs.rs/crates.io hygiene.
+   current on each release. Residual: the `v0.1.4` tag is still missing (the
+   other `v0.1.x` tags exist), so that one `compare` link 404s — note that
+   pushing any `v*` tag triggers the publish workflow, so cutting it
+   retroactively will produce a failed (already-published) publish run.
 
 2. **Consumer-driven API requests.** As janus's
    live loop starts feeding the regime detector and emitting regime/fear
@@ -43,10 +53,10 @@ fmt/clippy/test/docs/MSRV (1.94.1).
          regression-locks current behaviour rather than cross-checking the old
          impl — keeping the consolidation stable on future changes.
 
-3. **Quality / supply-chain CI** (mirror exchange-apiws): `cargo-deny`
-   (advisories + licenses), `cargo-semver-checks` against the last published
-   version (catch accidental breaking changes — this crate is a published dep
-   of janus + the bots), optional coverage badge.
+3. **✅ Quality / supply-chain CI** — `cargo-deny` (advisories + licenses +
+   sources, `deny.toml`) and `cargo-semver-checks` (vs. last published
+   version) gate every PR and the publish job. Residual: optional coverage
+   badge.
 
 4. **`docs.rs` polish.** `package.metadata.docs.rs` with `all-features = true`
    so the full surface builds on docs.rs; per-module doc examples for the

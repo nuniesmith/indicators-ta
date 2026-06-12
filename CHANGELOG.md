@@ -11,7 +11,7 @@ and may be coarser than going-forward entries.
 
 ## [Unreleased]
 
-The next release is **0.2.0** (breaking).
+## [0.2.0] - 2026-06-12
 
 ### Changed (breaking)
 - **Unified the incremental warm-up contract**: every `Incremental*` struct's
@@ -127,7 +127,8 @@ described under 0.1.0 below, hardened and extended.
   for streaming, a typed `IndicatorError`, and an indicator registry.
 - CI gates: `fmt`, `clippy`, `test`, `docs`, and an MSRV check.
 
-[Unreleased]: https://github.com/nuniesmith/indicators-ta/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/nuniesmith/indicators-ta/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/nuniesmith/indicators-ta/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/nuniesmith/indicators-ta/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/nuniesmith/indicators-ta/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/nuniesmith/indicators-ta/compare/v0.1.0...v0.1.3
