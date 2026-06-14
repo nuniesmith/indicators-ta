@@ -115,7 +115,6 @@ impl Indicator for SignalIndicator {
         let mut ms = MarketStructure::new(sp.swing_len, sp.atr_mult);
         let mut cvd = CVDTracker::new(self.cvd_params.slope_bars, self.cvd_params.div_lookback);
         let mut vol = VolatilityPercentile::new(100);
-        let cfg = IndicatorConfig::default();
         let mut streak = SignalStreak::new(self.signal_confirm_bars);
 
         let n = candles.len();
@@ -137,7 +136,7 @@ impl Indicator for SignalIndicator {
                 &liq,
                 &conf,
                 &ms,
-                &cfg,
+                &self.engine_cfg,
                 Some(&cvd),
                 Some(&vol),
             );
@@ -526,6 +525,123 @@ impl SignalStreak {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── engine_cfg honored by the batch adapter ───────────────────────────────
+
+    /// Smooth uptrend with rising volume — enough bars to clear the 100-bar
+    /// engine warm-up so `compute_signal` actually emits non-neutral votes.
+    fn rising_candles(n: usize, base: f64) -> Vec<Candle> {
+        (0..n)
+            .map(|i| {
+                let c = base + i as f64 * 0.5;
+                Candle {
+                    time: i64::try_from(i).unwrap() * 60_000, // same UTC day
+                    open: c - 0.2,
+                    high: c + 0.3,
+                    low: c - 0.3,
+                    close: c,
+                    volume: 1_000.0 + (i % 10) as f64 * 50.0,
+                }
+            })
+            .collect()
+    }
+
+    fn signal_indicator_with(cfg: IndicatorConfig) -> SignalIndicator {
+        SignalIndicator {
+            engine_cfg: cfg,
+            conf_params: ConfluenceParams::default(),
+            liq_params: LiquidityParams::default(),
+            struct_params: StructureParams::default(),
+            cvd_params: CvdParams::default(),
+            signal_confirm_bars: 1,
+        }
+    }
+
+    /// Regression test for the engine_cfg-ignored bug: `calculate` used to pass
+    /// a fresh `IndicatorConfig::default()` to `compute_signal`, so tuning
+    /// `engine_cfg.signal_mode` had zero effect on the emitted column. Here the
+    /// default (`"majority"`) and a tuned (`"strict"`) config must produce a
+    /// *different* signal column on the same candles. Before the fix the two
+    /// columns were byte-for-byte identical and this assertion failed.
+    #[test]
+    fn calculate_honors_engine_cfg_signal_mode() {
+        let candles = rising_candles(200, 50.0);
+
+        let default_cfg = IndicatorConfig {
+            signal_confirm_bars: 1,
+            ..IndicatorConfig::default()
+        };
+        assert_eq!(
+            default_cfg.signal_mode, "majority",
+            "precondition: default mode is majority"
+        );
+
+        let strict_cfg = IndicatorConfig {
+            signal_mode: "strict".into(),
+            signal_confirm_bars: 1,
+            ..IndicatorConfig::default()
+        };
+
+        let majority = signal_indicator_with(default_cfg)
+            .calculate(&candles)
+            .unwrap();
+        let strict = signal_indicator_with(strict_cfg)
+            .calculate(&candles)
+            .unwrap();
+
+        let maj_sig = majority.get("signal").unwrap();
+        let strict_sig = strict.get("signal").unwrap();
+
+        // Lenient "majority" fires longs on this uptrend; "strict" demands every
+        // layer align and fires far fewer (or none) — so the columns differ.
+        let differs = maj_sig
+            .iter()
+            .zip(strict_sig.iter())
+            .any(|(a, b)| (a - b).abs() > f64::EPSILON);
+        assert!(
+            differs,
+            "engine_cfg.signal_mode was ignored: majority and strict produced \
+             identical signal columns (the pre-fix bug)"
+        );
+    }
+
+    /// Stronger, count-based companion to the test above: on a clean uptrend
+    /// the lenient `"any"` mode fires many longs while the all-layers-must-agree
+    /// `"strict"` mode fires none. The adapter can only honour that contrast if
+    /// it reads `engine_cfg.signal_mode` (the pre-fix code passed a hard-coded
+    /// default to `compute_signal`, so both modes returned the same column).
+    #[test]
+    fn calculate_strict_mode_suppresses_longs_that_any_mode_fires() {
+        let candles = rising_candles(200, 50.0);
+
+        let count_longs = |mode: &str| -> usize {
+            let out = signal_indicator_with(IndicatorConfig {
+                signal_mode: mode.into(),
+                signal_confirm_bars: 1,
+                ..IndicatorConfig::default()
+            })
+            .calculate(&candles)
+            .unwrap();
+            out.get("signal")
+                .unwrap()
+                .iter()
+                .filter(|&&v| (v - 1.0).abs() < f64::EPSILON)
+                .count()
+        };
+
+        let any_longs = count_longs("any");
+        let strict_longs = count_longs("strict");
+
+        assert!(
+            any_longs > 0,
+            "expected 'any' mode to fire longs on a 200-bar uptrend, got {any_longs}"
+        );
+        assert!(
+            strict_longs < any_longs,
+            "expected 'strict' mode ({strict_longs}) to fire fewer longs than \
+             'any' mode ({any_longs}); engine_cfg.signal_mode appears ignored"
+        );
+    }
 
     // ── SignalStreak tests ────────────────────────────────────────────────────
 
