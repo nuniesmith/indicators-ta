@@ -140,6 +140,10 @@ pub fn true_range(high: &[f64], low: &[f64], close: &[f64]) -> Result<Vec<f64>, 
 }
 
 /// Average True Range (EMA-smoothed).
+///
+/// Note: smoothing is a plain EMA (`span = period`, Python-parity with
+/// `tr.ewm(...).mean()`), **not** Wilder's RMA (`alpha = 1/period`). The two
+/// differ by their decay constant, so values will not match a Wilder-style ATR.
 pub fn atr(
     high: &[f64],
     low: &[f64],

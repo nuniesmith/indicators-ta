@@ -11,6 +11,22 @@ and may be coarser than going-forward entries.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-06-14
+
+### Fixed
+- **Batch `SignalIndicator` adapter ignored its tuned `engine_cfg`.**
+  `SignalIndicator::calculate` constructed the engine from `self.engine_cfg`
+  but then built a fresh `IndicatorConfig::default()` and passed *that* to
+  `compute_signal`, so a tuned `signal_mode`, `conf_min_score`,
+  `hurst_threshold`, etc. were silently dropped in the aggregation step. It now
+  passes `self.engine_cfg`, so the adapter honours the configured signal mode
+  and thresholds. (Per-bar `compute_signal` callers were never affected.)
+
+### Documentation
+- Noted on `functions::atr` and the `Atr` indicator that their smoothing is
+  EMA/SMA (Python-parity), **not** Wilder's RMA, so consumers expecting a
+  Wilder-style ATR aren't surprised by the differing values.
+
 ## [0.2.1] - 2026-06-12
 
 > Version **0.2.0 was never published**: its tag was accidentally cut on the
@@ -131,7 +147,8 @@ described under 0.1.0 below, hardened and extended.
   for streaming, a typed `IndicatorError`, and an indicator registry.
 - CI gates: `fmt`, `clippy`, `test`, `docs`, and an MSRV check.
 
-[Unreleased]: https://github.com/nuniesmith/indicators-ta/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/nuniesmith/indicators-ta/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/nuniesmith/indicators-ta/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/nuniesmith/indicators-ta/compare/v0.1.5...v0.2.1
 [0.1.5]: https://github.com/nuniesmith/indicators-ta/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/nuniesmith/indicators-ta/compare/v0.1.3...v0.1.4

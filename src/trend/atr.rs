@@ -54,6 +54,10 @@ impl Default for AtrParams {
 
 // ── Indicator struct ──────────────────────────────────────────────────────────
 
+/// Average True Range indicator.
+///
+/// Note: smoothing is SMA (default) or EMA for Python-parity (`AtrParams::method`),
+/// **not** Wilder's RMA. A Wilder-smoothed ATR will produce different values.
 #[derive(Debug, Clone)]
 pub struct Atr {
     pub params: AtrParams,
