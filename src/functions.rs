@@ -315,6 +315,135 @@ impl ATR {
     }
 }
 
+/// Incremental Wilder RSI — the streaming counterpart of [`rsi`], in the same
+/// `update` / `value` / `is_ready` shape as [`EMA`] and [`ATR`] (this is the
+/// crate's top-level `RSI` export, so the three read uniformly: `value()` is an
+/// `f64`, NaN until warm). Seeds the average gain/loss over the first `period`
+/// deltas (needs `period + 1` prices), then Wilder-smooths — matching [`rsi`]
+/// and TA-Lib / TradingView.
+#[derive(Debug, Clone)]
+pub struct RSI {
+    period: usize,
+    prev: Option<f64>,
+    avg_gain: f64,
+    avg_loss: f64,
+    seeded: usize,
+    initialized: bool,
+    value: f64,
+}
+
+impl RSI {
+    pub fn new(period: usize) -> Self {
+        Self {
+            period: period.max(1),
+            prev: None,
+            avg_gain: 0.0,
+            avg_loss: 0.0,
+            seeded: 0,
+            initialized: false,
+            value: f64::NAN,
+        }
+    }
+
+    pub fn update(&mut self, price: f64) {
+        let Some(prev) = self.prev else {
+            self.prev = Some(price);
+            return;
+        };
+        let delta = price - prev;
+        let gain = delta.max(0.0);
+        let loss = (-delta).max(0.0);
+        self.prev = Some(price);
+
+        if !self.initialized {
+            // Seed window: simple mean of the first `period` deltas.
+            self.avg_gain += gain;
+            self.avg_loss += loss;
+            self.seeded += 1;
+            if self.seeded >= self.period {
+                self.avg_gain /= self.period as f64;
+                self.avg_loss /= self.period as f64;
+                self.initialized = true;
+                self.value = rsi_from(self.avg_gain, self.avg_loss);
+            }
+        } else {
+            let w = (self.period - 1) as f64;
+            self.avg_gain = (self.avg_gain * w + gain) / self.period as f64;
+            self.avg_loss = (self.avg_loss * w + loss) / self.period as f64;
+            self.value = rsi_from(self.avg_gain, self.avg_loss);
+        }
+    }
+
+    pub fn value(&self) -> f64 {
+        self.value
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.initialized
+    }
+
+    pub fn reset(&mut self) {
+        *self = Self::new(self.period);
+    }
+}
+
+/// `RSI = 100 − 100 / (1 + avg_gain/avg_loss)`, with the zero-division edges
+/// matching [`rsi`] (no movement → 50, only gains → 100).
+#[inline]
+fn rsi_from(avg_gain: f64, avg_loss: f64) -> f64 {
+    if avg_loss == 0.0 {
+        if avg_gain == 0.0 { 50.0 } else { 100.0 }
+    } else {
+        100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
+    }
+}
+
+#[cfg(test)]
+mod rsi_inc_tests {
+    use super::*;
+
+    #[test]
+    fn warmup_then_matches_wilder_batch() {
+        use crate::indicator::Indicator;
+        use crate::momentum::Rsi;
+        use crate::types::Candle;
+        let prices: Vec<f64> = (0..40).map(|i| 100.0 + (i as f64 * 0.4).sin() * 8.0).collect();
+        let candles: Vec<Candle> = prices
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| Candle { time: i as i64, open: c, high: c, low: c, close: c, volume: 1.0 })
+            .collect();
+        // Matches the standard Wilder batch (momentum::Rsi), not the EMA-smoothed
+        // functions::rsi.
+        let batch = Rsi::with_period(14).calculate(&candles).unwrap();
+        let batch_vals = batch.get("RSI_14").unwrap();
+
+        let mut inc = RSI::new(14);
+        for (i, &p) in prices.iter().enumerate() {
+            inc.update(p);
+            if inc.is_ready() {
+                assert!(
+                    (inc.value() - batch_vals[i]).abs() < 1e-9,
+                    "i={i}: {} vs {}",
+                    inc.value(),
+                    batch_vals[i]
+                );
+            } else {
+                assert!(inc.value().is_nan());
+            }
+        }
+    }
+
+    #[test]
+    fn constant_gains_is_100() {
+        let mut inc = RSI::new(5);
+        for i in 0..10 {
+            inc.update(i as f64);
+        }
+        assert!((inc.value() - 100.0).abs() < 1e-9);
+    }
+}
+
 /// Bundle of per-strategy indicator series.
 #[derive(Debug, Clone)]
 pub struct StrategyIndicators {

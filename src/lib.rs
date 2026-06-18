@@ -23,7 +23,7 @@ pub mod regime;
 // ── Re-exports: core ─────────────────────────────────────────────────────────
 pub use functions::{
     ATR, BollingerBandsValue, EMA, IncrementalAtr, IncrementalBollinger, IncrementalEma,
-    IncrementalMacd, IncrementalRsi, IndicatorCalculator, StrategyIndicators,
+    IncrementalMacd, IncrementalRsi, IndicatorCalculator, RSI, StrategyIndicators,
 };
 pub use functions::{atr, ema, macd, rsi, sma, true_range};
 pub use indicator::{Indicator, IndicatorOutput, PriceColumn};
@@ -60,7 +60,9 @@ pub use signal::{VolumeRegime, VolumeRegimeParams};
 pub use regime::RegimeDetector;
 /// Internal Bollinger Bands used by the regime detector (incremental, not batch).
 /// For the batch `Indicator` impl see [`volatility::BollingerBands`].
-pub use regime::{ADX, BollingerBands, BollingerBandsValues, RSI};
+pub use regime::{ADX, BollingerBands, BollingerBandsValues};
+// NB: the top-level `RSI` is now the uniform `functions::RSI` (value() -> f64,
+// like EMA/ATR); the regime primitive stays available as `regime::RSI`.
 pub use regime::{
     ActiveStrategy, AssetSummary, DetectionMethod, EnhancedRouter, EnhancedRouterConfig,
     RoutedSignal,
