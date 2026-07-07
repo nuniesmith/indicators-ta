@@ -11,6 +11,20 @@ and may be coarser than going-forward entries.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-07
+
+### Added
+- **`descriptor` module — indicator metadata layer for chart-page
+  auto-discovery.** New public API: `IndicatorDescriptor`, `ParamSpec`,
+  `IndicatorCategory` (`Overlay`/`Oscillator`), `ParamKind`
+  (`Integer`/`Float`), and `catalog() -> Vec<IndicatorDescriptor>`. All are
+  serde-serializable so the janus catalog API can emit them as JSON. `catalog()`
+  is a hand-maintained registry with one honest entry per indicator (id matches
+  the runtime registry name, params mirror each `factory()`'s defaults). Purely
+  additive — the compute API and runtime `IndicatorRegistry` are unchanged, so
+  existing consumers keep working until they opt in. Minor version bump so janus
+  can depend on the new metadata.
+
 ## [0.2.2] - 2026-06-14
 
 ### Fixed
