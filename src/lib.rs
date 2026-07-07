@@ -1,6 +1,7 @@
 //! # indicators — Technical Indicators + Market Regime Detection
 
 // ── Core types & traits ───────────────────────────────────────────────────────
+pub mod descriptor;
 pub mod error;
 pub mod functions;
 pub mod indicator;
@@ -26,6 +27,8 @@ pub use functions::{
     IncrementalMacd, IncrementalRsi, IndicatorCalculator, RSI, StrategyIndicators,
 };
 pub use functions::{atr, ema, macd, rsi, sma, true_range};
+// ── Re-exports: indicator metadata (chart-page auto-discovery) ───────────────
+pub use descriptor::{IndicatorCategory, IndicatorDescriptor, ParamKind, ParamSpec, catalog};
 pub use indicator::{Indicator, IndicatorOutput, PriceColumn};
 pub use indicator_config::{IndicatorConfig, SignalEngineConfig};
 // IndexMap backs IndicatorOutput::into_inner(); re-exported so callers don't
