@@ -374,6 +374,79 @@ mod tests {
         }
     }
 
+    /// Registry names that are deliberately *not* in the descriptor [`catalog()`]
+    /// yet. These are the composite signal-engine and regime indicators, whose
+    /// outputs are labels/scores rather than a single plottable series, so they
+    /// have no chart-page representation decided yet (category + honest param
+    /// bounds). They are allow-listed so [`every_registry_entry_has_a_descriptor`]
+    /// stays green while still catching drift: adding a *new* indicator without a
+    /// descriptor (and without listing it here) fails CI.
+    ///
+    /// TODO(indicators-ta): give each of these a real [`IndicatorDescriptor`]
+    /// (decide Overlay/Oscillator + param bounds mirroring its `factory()`), then
+    /// delete it from this list. When this list is finally empty, drop it and the
+    /// allow-list branch below.
+    const CATALOG_ALLOW_LIST: &[&str] = &[
+        // signal engine (7)
+        "confluence",
+        "cvd",
+        "engine",
+        "liquidity",
+        "signal",
+        "structure",
+        "vol_regime",
+        // regime (5)
+        "detector",
+        "ensemble",
+        "hmm",
+        "primitives",
+        "router",
+    ];
+
+    #[test]
+    fn every_registry_entry_has_a_descriptor() {
+        // Direction opposite to `ids_match_runtime_registry`: the runtime
+        // registry must be a subset of the descriptor catalog (modulo the
+        // documented allow-list). This is the gate that catches a newly-added
+        // indicator that forgets its descriptor — such an entry is neither in
+        // the catalog nor the allow-list, so this test goes red.
+        let reg = crate::registry::registry();
+        let cataloged: HashSet<&str> = catalog().into_iter().map(|d| d.id).collect();
+        let allowed: HashSet<&str> = CATALOG_ALLOW_LIST.iter().copied().collect();
+
+        let missing: Vec<String> = reg
+            .list()
+            .into_iter()
+            .filter(|name| !cataloged.contains(name.as_str()) && !allowed.contains(name.as_str()))
+            .collect();
+
+        assert!(
+            missing.is_empty(),
+            "registered indicator(s) have no descriptor and are not allow-listed: {missing:?} \
+             — add an IndicatorDescriptor to catalog() (or, if it has no chart representation, \
+             add it to CATALOG_ALLOW_LIST with a TODO)"
+        );
+    }
+
+    #[test]
+    fn allow_list_entries_are_registered_and_uncataloged() {
+        // Keep the allow-list honest: every entry must (a) actually be registered
+        // — otherwise it is stale and should be removed — and (b) not already have
+        // a descriptor — otherwise it should be dropped from the allow-list.
+        let reg = crate::registry::registry();
+        let cataloged: HashSet<&str> = catalog().into_iter().map(|d| d.id).collect();
+        for &id in CATALOG_ALLOW_LIST {
+            assert!(
+                reg.contains(id),
+                "allow-listed `{id}` is not registered — remove the stale entry"
+            );
+            assert!(
+                !cataloged.contains(id),
+                "allow-listed `{id}` now has a descriptor — remove it from CATALOG_ALLOW_LIST"
+            );
+        }
+    }
+
     #[test]
     fn serializes_to_expected_json_shape() {
         let rsi = catalog()

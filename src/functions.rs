@@ -315,12 +315,13 @@ impl ATR {
     }
 }
 
-/// Incremental Wilder RSI — the streaming counterpart of [`rsi`], in the same
-/// `update` / `value` / `is_ready` shape as [`EMA`] and [`ATR`] (this is the
-/// crate's top-level `RSI` export, so the three read uniformly: `value()` is an
-/// `f64`, NaN until warm). Seeds the average gain/loss over the first `period`
-/// deltas (needs `period + 1` prices), then Wilder-smooths — matching [`rsi`]
-/// and TA-Lib / TradingView.
+/// Incremental Wilder RSI — the streaming counterpart of [`rsi`].
+///
+/// Uses the same `update` / `value` / `is_ready` shape as [`EMA`] and [`ATR`]
+/// (this is the crate's top-level `RSI` export, so the three read uniformly:
+/// `value()` is an `f64`, NaN until warm). Seeds the average gain/loss over the
+/// first `period` deltas (needs `period + 1` prices), then Wilder-smooths —
+/// matching [`rsi`] and TA-Lib / TradingView.
 #[derive(Debug, Clone)]
 pub struct RSI {
     period: usize,
@@ -407,11 +408,20 @@ mod rsi_inc_tests {
         use crate::indicator::Indicator;
         use crate::momentum::Rsi;
         use crate::types::Candle;
-        let prices: Vec<f64> = (0..40).map(|i| 100.0 + (i as f64 * 0.4).sin() * 8.0).collect();
+        let prices: Vec<f64> = (0..40)
+            .map(|i| 100.0 + (i as f64 * 0.4).sin() * 8.0)
+            .collect();
         let candles: Vec<Candle> = prices
             .iter()
             .enumerate()
-            .map(|(i, &c)| Candle { time: i as i64, open: c, high: c, low: c, close: c, volume: 1.0 })
+            .map(|(i, &c)| Candle {
+                time: i64::try_from(i).unwrap(),
+                open: c,
+                high: c,
+                low: c,
+                close: c,
+                volume: 1.0,
+            })
             .collect();
         // Matches the standard Wilder batch (momentum::Rsi), not the EMA-smoothed
         // functions::rsi.
