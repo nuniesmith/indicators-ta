@@ -229,7 +229,7 @@ mod tests {
     fn needs_a_full_window() {
         assert_eq!(last(&flat(199, 100.0)), None);
         assert!(last(&flat(200, 100.0)).is_some());
-        assert!(sma_band(&[], 200, 0.05).unwrap().is_empty());
+        assert_eq!(sma_band(&[], 200, 0.05).unwrap(), Vec::new());
     }
 
     #[test]

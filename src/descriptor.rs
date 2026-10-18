@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     fn catalog_is_non_empty() {
-        assert!(!catalog().is_empty());
+        assert_ne!(catalog().len(), 0);
     }
 
     #[test]
