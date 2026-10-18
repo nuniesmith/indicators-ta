@@ -6,6 +6,7 @@ pub mod linear_regression;
 pub mod macd;
 pub mod parabolic_sar;
 pub mod sma;
+pub mod sma_band;
 pub mod wma;
 
 pub use atr::Atr;
@@ -14,6 +15,7 @@ pub use linear_regression::LinearRegression;
 pub use macd::Macd;
 pub use parabolic_sar::ParabolicSar;
 pub use sma::Sma;
+pub use sma_band::{BandReading, SmaBand, SmaBandParams, sma_band};
 pub use wma::Wma;
 
 use crate::registry::IndicatorRegistry;
@@ -26,5 +28,6 @@ pub fn register_all(reg: &IndicatorRegistry) {
     reg.register("macd", macd::factory);
     reg.register("parabolicsar", parabolic_sar::factory);
     reg.register("sma", sma::factory);
+    reg.register("smaband", sma_band::factory);
     reg.register("wma", wma::factory);
 }

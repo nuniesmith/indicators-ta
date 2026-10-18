@@ -855,7 +855,7 @@ mod tests {
         assert_eq!(signal.detection_method, DetectionMethod::Indicators);
         assert!((0.0..=1.0).contains(&signal.confidence));
         assert!((0.0..=1.0).contains(&signal.position_factor));
-        assert!(!signal.reason.is_empty());
+        assert_ne!(signal.reason, "");
         // Indicator method doesn't populate these
         assert!(signal.methods_agree.is_none());
         assert!(signal.state_probabilities.is_none());

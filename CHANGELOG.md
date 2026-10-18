@@ -11,6 +11,21 @@ and may be coarser than going-forward entries.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-18
+
+### Added
+- **`sma_band` — a moving-average band with hysteresis, the long-term trend
+  regime.** Bull once the close rises more than `band` above its
+  `period`-bar SMA, bear once it falls more than `band` below, unchanged
+  inside the band; the first reading is the plain close-above-average test.
+  `sma_band(closes, period, band) -> Vec<Option<BandReading>>` gives every
+  bar's reading (close, average, bull) in one pass. `SmaBand` is the same
+  rule as an `Indicator` (columns `SMA_BAND_{period}`, `_upper`, `_lower`,
+  `_bull`), registered as `"smaband"` with a catalog descriptor. The defaults
+  (200 bars, 5%) are the nuniesmith/crypto bot's trading rule, so the bot,
+  Janus and research can share one definition. The average is
+  `functions::sma`'s window mean, bit for bit.
+
 ## [0.3.0] - 2026-07-07
 
 ### Added
@@ -161,7 +176,9 @@ described under 0.1.0 below, hardened and extended.
   for streaming, a typed `IndicatorError`, and an indicator registry.
 - CI gates: `fmt`, `clippy`, `test`, `docs`, and an MSRV check.
 
-[Unreleased]: https://github.com/nuniesmith/indicators-ta/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/nuniesmith/indicators-ta/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/nuniesmith/indicators-ta/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/nuniesmith/indicators-ta/compare/v0.2.3...v0.3.0
 [0.2.2]: https://github.com/nuniesmith/indicators-ta/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/nuniesmith/indicators-ta/compare/v0.1.5...v0.2.1
 [0.1.5]: https://github.com/nuniesmith/indicators-ta/compare/v0.1.4...v0.1.5
