@@ -27,6 +27,8 @@ pub use functions::{
     IncrementalMacd, IncrementalRsi, IndicatorCalculator, RSI, StrategyIndicators,
 };
 pub use functions::{atr, ema, macd, rsi, sma, true_range};
+// The long-term trend regime: a moving-average band with hysteresis.
+pub use trend::{BandReading, SmaBand, SmaBandParams, sma_band};
 // ── Re-exports: indicator metadata (chart-page auto-discovery) ───────────────
 pub use descriptor::{IndicatorCategory, IndicatorDescriptor, ParamKind, ParamSpec, catalog};
 pub use indicator::{Indicator, IndicatorOutput, PriceColumn};

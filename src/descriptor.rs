@@ -174,6 +174,15 @@ pub fn catalog() -> Vec<IndicatorDescriptor> {
             vec![P::int("period", 20.0, PMIN, PMAX)],
         ),
         IndicatorDescriptor::new(
+            "smaband",
+            "SMA_BAND",
+            Overlay,
+            vec![
+                P::int("period", 200.0, PMIN, PMAX),
+                P::float("band", 0.05, 0.0, 0.5),
+            ],
+        ),
+        IndicatorDescriptor::new(
             "wma",
             "WMA",
             Overlay,
